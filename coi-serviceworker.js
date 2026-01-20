@@ -2,9 +2,13 @@
 // This service worker adds COOP/COEP headers to enable SharedArrayBuffer
 // Required for ffmpeg.wasm multi-threaded support
 
-self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("install", () => {
+    self.skipWaiting();
+});
 
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener("activate", (event) => {
+    event.waitUntil(self.clients.claim());
+});
 
 self.addEventListener("fetch", (event) => {
     const request = event.request;
@@ -21,6 +25,7 @@ self.addEventListener("fetch", (event) => {
                 }
 
                 const newHeaders = new Headers(response.headers);
+                // credentialless allows loading cross-origin resources from CDNs
                 newHeaders.set("Cross-Origin-Embedder-Policy", "credentialless");
                 newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
 

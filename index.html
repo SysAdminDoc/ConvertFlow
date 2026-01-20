@@ -6,24 +6,66 @@
     <title>ConvertFlow - Modern File Converter</title>
     <!-- Register service worker for SharedArrayBuffer support -->
     <script>
-        if (!window.crossOriginIsolated && navigator.serviceWorker) {
-            navigator.serviceWorker.register('coi-serviceworker.js')
-                .then(reg => {
-                    console.log('Service worker registered for COOP/COEP');
-                    if (reg.active && !navigator.serviceWorker.controller) {
-                        window.location.reload();
-                    }
-                    reg.addEventListener('updatefound', () => {
-                        const worker = reg.installing;
-                        worker.addEventListener('statechange', () => {
-                            if (worker.state === 'activated' && !navigator.serviceWorker.controller) {
-                                window.location.reload();
-                            }
-                        });
-                    });
-                })
-                .catch(err => console.warn('Service worker registration failed:', err));
-        }
+        // This must run before FFmpeg loads
+        window.coiReady = (async function() {
+            // Already cross-origin isolated? We're good
+            if (window.crossOriginIsolated) {
+                console.log('✓ Cross-origin isolated, SharedArrayBuffer available');
+                return true;
+            }
+            
+            // Check if we have a service worker controller
+            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                // We have a controller but still not isolated
+                // Check if page was served from cache without headers
+                console.log('Service worker active, checking isolation...');
+                // Give it a moment then reload
+                await new Promise(r => setTimeout(r, 100));
+                if (!window.crossOriginIsolated) {
+                    console.log('Not isolated despite service worker, reloading...');
+                    window.location.reload();
+                    return new Promise(() => {}); // Never resolves, we're reloading
+                }
+                return true;
+            }
+            
+            if (!navigator.serviceWorker) {
+                console.error('Service workers not supported');
+                return false;
+            }
+            
+            try {
+                // Show setup notice
+                const notice = document.createElement('div');
+                notice.id = 'setup-notice';
+                notice.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px;';
+                notice.innerHTML = `
+                    <div style="width:40px;height:40px;border:3px solid #333;border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;"></div>
+                    <div style="color:white;font-family:system-ui;font-size:16px;">Setting up file converter...</div>
+                    <div style="color:#888;font-family:system-ui;font-size:13px;">Page will reload automatically</div>
+                    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+                `;
+                document.documentElement.appendChild(notice);
+                
+                const registration = await navigator.serviceWorker.register('coi-serviceworker.js');
+                console.log('Service worker registered');
+                
+                // Wait for the service worker to be ready and controlling
+                await navigator.serviceWorker.ready;
+                
+                // Small delay to ensure service worker is fully active
+                await new Promise(r => setTimeout(r, 100));
+                
+                console.log('Service worker ready, reloading to enable isolation...');
+                window.location.reload();
+                return new Promise(() => {}); // Never resolves, we're reloading
+            } catch (err) {
+                console.error('Service worker registration failed:', err);
+                const notice = document.getElementById('setup-notice');
+                if (notice) notice.remove();
+                return false;
+            }
+        })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -945,7 +987,7 @@
                     <div class="ffmpeg-loading">
                         <div class="spinner"></div>
                         <div class="loading-text">Loading FFmpeg...</div>
-                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">First load may reload the page once</p>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">This may take a moment on first load (~25MB)</p>
                     </div>
                 </div>
 
@@ -1147,6 +1189,40 @@
 
         // FFmpeg initialization (using 0.10.x API with coi-serviceworker for SharedArrayBuffer)
         async function initFFmpeg() {
+            // Wait for service worker setup to complete
+            const coiResult = await window.coiReady;
+            
+            // Check if SharedArrayBuffer is available
+            if (typeof SharedArrayBuffer === 'undefined') {
+                const isHttps = window.location.protocol === 'https:';
+                const hasServiceWorker = 'serviceWorker' in navigator;
+                
+                let errorMsg = 'SharedArrayBuffer is not available. ';
+                if (!isHttps && window.location.hostname !== 'localhost') {
+                    errorMsg += 'Please use HTTPS.';
+                } else if (!hasServiceWorker) {
+                    errorMsg += 'Your browser does not support Service Workers.';
+                } else if (!navigator.serviceWorker.controller) {
+                    errorMsg += 'Please refresh the page to complete setup.';
+                } else {
+                    errorMsg += 'Your browser may not support cross-origin isolation. Try Chrome 92+, Firefox 79+, or Edge 92+.';
+                }
+                
+                document.getElementById('ffmpegStatus').innerHTML = `
+                    <div class="status-message error">
+                        <span>⚠️</span>
+                        <div>
+                            <strong>Setup Required</strong><br>
+                            <span style="font-size: 12px;">${errorMsg}</span>
+                        </div>
+                    </div>
+                    <button onclick="window.location.reload()" style="width: 100%; margin-top: 12px; padding: 10px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: white; cursor: pointer; font-weight: 500;">
+                        Reload Page
+                    </button>
+                `;
+                return;
+            }
+            
             try {
                 const { createFFmpeg, fetchFile: ffFetchFile } = FFmpeg;
                 
