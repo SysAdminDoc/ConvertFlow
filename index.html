@@ -464,7 +464,28 @@ function previewTrim(){const s=parseFloat(document.getElementById('videoTrimStar
 function resetTrim(){document.getElementById('videoTrimStart').value='';document.getElementById('videoTrimEnd').value='';}
 function setVideoRotation(v){document.getElementById('videoRotation').value=v;}
 async function exportVideo(){if(!videoFile||!ffmpegLoaded)return;const status=document.getElementById('exportStatus');status.textContent='Processing...';const fmt=document.getElementById('videoExportFormat').value,qual=document.getElementById('videoExportQuality').value,res=document.getElementById('videoExportRes').value;const inputName='input'+videoFile.name.substring(videoFile.name.lastIndexOf('.')),outputName=`output.${fmt}`;try{ffmpeg.FS('writeFile',inputName,await window.ffmpegFetchFile(videoFile));const args=[],ts=document.getElementById('videoTrimStart').value,te=document.getElementById('videoTrimEnd').value;if(ts)args.push('-ss',ts);args.push('-i',inputName);if(te)args.push('-t',String(te-(ts||0)));if(fmt==='gif'){const sc=res?res.split(':')[0]:'480';args.push('-vf',`fps=15,scale=${sc}:-1:flags=lanczos`,'-loop','0');}else{args.push('-c:v','libx264','-crf',String(qualityCRF[qual]));const vf=[];if(res){const[w,h]=res.split(':');vf.push(`scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2`);}const rot=document.getElementById('videoRotation').value;if(rot==='hflip'||rot==='vflip')vf.push(rot);else if(rot)vf.push(`rotate=${rot}*PI/180`);const spd=document.getElementById('videoSpeed').value;if(spd&&spd!=1)vf.push(`setpts=${1/parseFloat(spd)}*PTS`);const br=document.getElementById('vBrightness').value/100,ct=document.getElementById('vContrast').value/100,st=document.getElementById('vSaturation').value/100;if(br||ct||st)vf.push(`eq=brightness=${br}:contrast=${1+ct}:saturation=${1+st}`);if(document.getElementById('effectGrayscale').checked)vf.push('colorchannelmixer=.3:.4:.3:0:.3:.4:.3:0:.3:.4:.3');if(document.getElementById('effectNegative').checked)vf.push('negate');if(document.getElementById('effectVignette').checked)vf.push('vignette');if(vf.length)args.push('-vf',vf.join(','));if(document.getElementById('audioRemove').checked)args.push('-an');else{args.push('-c:a','aac','-b:a','192k');const af=[],vol=document.getElementById('audioVol').value/100;if(vol!=1)af.push(`volume=${vol}`);if(spd&&spd!=1)af.push(`atempo=${spd}`);if(af.length)args.push('-af',af.join(','));}}args.push('-y',outputName);await ffmpeg.run(...args);const data=ffmpeg.FS('readFile',outputName);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data.buffer],{type:getMimeType(fmt)}));a.download=`edited-video.${fmt}`;a.click();ffmpeg.FS('unlink',inputName);ffmpeg.FS('unlink',outputName);status.textContent='Export complete!';toast('success','Video exported!');}catch(e){console.error(e);status.textContent='Export failed';toast('error','Export failed');}}
-async function extractAudio(){if(!videoFile||!ffmpegLoaded)return;toast('info','Extracting audio...');const inputName='input'+videoFile.name.substring(videoFile.name.lastIndexOf('.')),outputName='output.mp3';try{ffmpeg.FS('writeFile',inputName,await window.ffmpegFetchFile(videoFile));await ffmpeg.run('-i',inputName,'-vn','-c:a','libmp3lame','-b:a','192k','-y',outputName);const data=ffmpeg.FS('readFile',outputName);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data.buffer],{type:'audio/mpeg'}));a.download='extracted-audio.mp3';a.click();ffmpeg.FS('unlink',inputName);ffmpeg.FS('unlink',outputName);toast('success','Audio extracted!');}catch(e){console.error(e);toast('error','Extraction failed');}}
+async function extractAudio(){if(!videoFile||!ffmpegLoaded)return;toast('info','Extracting audio...');const inputName='input'+videoFile.name.substring(videoFile.name.lastIndexOf('.')),outputName='output.mp3';try{ffmpeg.FS('writeFile',inputName,await window.ffmpegFetchFile(videoFile));await ffmpeg.run('-i',inputName,'-vn','-c:a','libmp3lame','-b:a','192k','-y',outputName);
+        const data=ffmpeg.FS('readFile',outputName);
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([data.buffer],{type:'audio/mpeg'}));
+        a.download='extracted-audio.mp3';
+        a.click();
+        ffmpeg.FS('unlink',inputName);ffmpeg.FS('unlink',outputName);
+        toast('success','Audio extracted!');
+    }catch(e){console.error(e);toast('error','Extraction failed');}
+}
+
+// Toast notifications
+function toast(type,msg){
+    const t=document.createElement('div');
+    t.className=`toast ${type}`;
+    t.innerHTML=`<span class="toast-icon">${type==='success'?'✓':type==='error'?'✕':'ℹ'}</span><span class="toast-text">${msg}</span>`;
+    document.getElementById('toastContainer').appendChild(t);
+    setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},3000);
+}
+</script>
+</body>
+</html>'-b:a','192k','-y',outputName);const data=ffmpeg.FS('readFile',outputName);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data.buffer],{type:'audio/mpeg'}));a.download='extracted-audio.mp3';a.click();ffmpeg.FS('unlink',inputName);ffmpeg.FS('unlink',outputName);toast('success','Audio extracted!');}catch(e){console.error(e);toast('error','Extraction failed');}}
 
 function toast(type,msg){const t=document.createElement('div');t.className=`toast ${type}`;t.innerHTML=`<span class="toast-icon">${type==='success'?'✓':type==='error'?'✕':'ℹ'}</span><span class="toast-text">${msg}</span>`;document.getElementById('toastContainer').appendChild(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},3000);}
 </script>
