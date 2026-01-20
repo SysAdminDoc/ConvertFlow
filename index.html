@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ConvertFlow - Modern File Converter</title>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -1125,31 +1124,23 @@
             loadTheme();
         });
 
-        // FFmpeg initialization
+        // FFmpeg initialization (using 0.11.x API)
         async function initFFmpeg() {
             try {
-                const { FFmpeg } = FFmpegWASM;
-                const { fetchFile, toBlobURL } = FFmpegUtil;
-
-                ffmpeg = new FFmpeg();
-
-                ffmpeg.on('progress', ({ progress, time }) => {
-                    updateProgress(Math.round(progress * 100));
-                });
-
-                ffmpeg.on('log', ({ message }) => {
-                    console.log('FFmpeg:', message);
-                });
-
-                // Use jsDelivr CDN with proper CORS headers
-                const coreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-                const ffmpegBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd';
+                const { createFFmpeg, fetchFile: ffFetchFile } = FFmpeg;
                 
-                await ffmpeg.load({
-                    coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                    classWorkerURL: await toBlobURL(`${ffmpegBaseURL}/814.ffmpeg.js`, 'text/javascript'),
+                ffmpeg = createFFmpeg({
+                    log: true,
+                    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+                    progress: ({ ratio }) => {
+                        updateProgress(Math.round(ratio * 100));
+                    }
                 });
+
+                // Store fetchFile for later use
+                window.ffmpegFetchFile = ffFetchFile;
+
+                await ffmpeg.load();
 
                 ffmpegLoaded = true;
                 document.getElementById('ffmpegStatus').innerHTML = `
@@ -1406,7 +1397,7 @@
             btn.classList.add('loading');
             btn.disabled = true;
 
-            const { fetchFile } = FFmpegUtil;
+            const ffFetchFile = window.ffmpegFetchFile;
 
             for (const fileObj of files) {
                 if (fileObj.status === 'completed') continue;
@@ -1416,15 +1407,17 @@
                 renderFileList();
 
                 try {
-                    const inputName = 'input_' + fileObj.id + getExtension(fileObj.name);
-                    const outputName = 'output_' + fileObj.id + '.' + selectedFormat;
+                    const inputName = 'input' + getExtension(fileObj.name);
+                    const outputName = 'output.' + selectedFormat;
 
-                    await ffmpeg.writeFile(inputName, await fetchFile(fileObj.file));
+                    // Write input file to FFmpeg's virtual filesystem
+                    ffmpeg.FS('writeFile', inputName, await ffFetchFile(fileObj.file));
 
                     const ffmpegArgs = buildFFmpegArgs(inputName, outputName, fileObj.type);
-                    await ffmpeg.exec(ffmpegArgs);
+                    await ffmpeg.run(...ffmpegArgs);
 
-                    const data = await ffmpeg.readFile(outputName);
+                    // Read the output file
+                    const data = ffmpeg.FS('readFile', outputName);
                     const blob = new Blob([data.buffer], { type: getMimeType(selectedFormat) });
 
                     fileObj.converted = URL.createObjectURL(blob);
@@ -1433,8 +1426,9 @@
                     fileObj.status = 'completed';
                     fileObj.progress = 100;
 
-                    await ffmpeg.deleteFile(inputName);
-                    await ffmpeg.deleteFile(outputName);
+                    // Clean up files
+                    ffmpeg.FS('unlink', inputName);
+                    ffmpeg.FS('unlink', outputName);
 
                     showToast('success', 'Converted!', fileObj.name);
                 } catch (error) {
