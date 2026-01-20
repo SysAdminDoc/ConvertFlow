@@ -1124,14 +1124,15 @@
             loadTheme();
         });
 
-        // FFmpeg initialization (using 0.11.x API)
+        // FFmpeg initialization (using 0.11.x API with single-threaded core)
         async function initFFmpeg() {
             try {
                 const { createFFmpeg, fetchFile: ffFetchFile } = FFmpeg;
                 
                 ffmpeg = createFFmpeg({
                     log: true,
-                    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+                    // Use single-threaded core - doesn't require SharedArrayBuffer
+                    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
                     progress: ({ ratio }) => {
                         updateProgress(Math.round(ratio * 100));
                     }
