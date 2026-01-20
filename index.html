@@ -3,1695 +3,1009 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ConvertFlow - Modern File Converter</title>
-    <!-- Register service worker for SharedArrayBuffer support -->
+    <title>ConvertFlow - Universal File Converter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Service worker for SharedArrayBuffer -->
     <script>
-        // This must run before FFmpeg loads
         window.coiReady = (async function() {
-            // Already cross-origin isolated? We're good
-            if (window.crossOriginIsolated) {
-                console.log('✓ Cross-origin isolated, SharedArrayBuffer available');
-                return true;
-            }
-            
-            // Check if we have a service worker controller
-            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                // We have a controller but still not isolated
-                // Check if page was served from cache without headers
-                console.log('Service worker active, checking isolation...');
-                // Give it a moment then reload
+            if (window.crossOriginIsolated) return true;
+            if (navigator.serviceWorker?.controller) {
                 await new Promise(r => setTimeout(r, 100));
-                if (!window.crossOriginIsolated) {
-                    console.log('Not isolated despite service worker, reloading...');
-                    window.location.reload();
-                    return new Promise(() => {}); // Never resolves, we're reloading
-                }
+                if (!window.crossOriginIsolated) { window.location.reload(); return new Promise(() => {}); }
                 return true;
             }
-            
-            if (!navigator.serviceWorker) {
-                console.error('Service workers not supported');
-                return false;
-            }
-            
+            if (!navigator.serviceWorker) return false;
             try {
-                // Show setup notice
                 const notice = document.createElement('div');
                 notice.id = 'setup-notice';
-                notice.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px;';
-                notice.innerHTML = `
-                    <div style="width:40px;height:40px;border:3px solid #333;border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;"></div>
-                    <div style="color:white;font-family:system-ui;font-size:16px;">Setting up file converter...</div>
-                    <div style="color:#888;font-family:system-ui;font-size:13px;">Page will reload automatically</div>
-                    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-                `;
+                notice.style.cssText = 'position:fixed;inset:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px;';
+                notice.innerHTML = '<div style="width:40px;height:40px;border:3px solid #222;border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;"></div><div style="color:white;font-family:system-ui;font-size:16px;">Initializing ConvertFlow...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
                 document.documentElement.appendChild(notice);
-                
-                const registration = await navigator.serviceWorker.register('coi-serviceworker.js');
-                console.log('Service worker registered');
-                
-                // Wait for the service worker to be ready and controlling
+                await navigator.serviceWorker.register('coi-serviceworker.js');
                 await navigator.serviceWorker.ready;
-                
-                // Small delay to ensure service worker is fully active
                 await new Promise(r => setTimeout(r, 100));
-                
-                console.log('Service worker ready, reloading to enable isolation...');
                 window.location.reload();
-                return new Promise(() => {}); // Never resolves, we're reloading
-            } catch (err) {
-                console.error('Service worker registration failed:', err);
-                const notice = document.getElementById('setup-notice');
-                if (notice) notice.remove();
-                return false;
-            }
+                return new Promise(() => {});
+            } catch (err) { document.getElementById('setup-notice')?.remove(); return false; }
         })();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
     <style>
         :root {
-            --bg-primary: #0f0f0f;
-            --bg-secondary: #1a1a1a;
-            --bg-tertiary: #252525;
-            --bg-elevated: #2a2a2a;
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --text-muted: #666666;
-            --accent: #6366f1;
-            --accent-hover: #818cf8;
-            --accent-dim: rgba(99, 102, 241, 0.15);
-            --success: #22c55e;
-            --success-dim: rgba(34, 197, 94, 0.15);
-            --warning: #f59e0b;
-            --warning-dim: rgba(245, 158, 11, 0.15);
-            --error: #ef4444;
-            --error-dim: rgba(239, 68, 68, 0.15);
-            --border: #333333;
-            --border-light: #404040;
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 16px;
-            --radius-xl: 24px;
-            --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-            --shadow-lg: 0 8px 30px rgba(0,0,0,0.5);
-            --transition: 0.2s ease;
+            --bg-0: #09090b; --bg-1: #0f0f11; --bg-2: #18181b; --bg-3: #1f1f23; --bg-4: #27272a;
+            --text-0: #fafafa; --text-1: #a1a1aa; --text-2: #71717a; --text-3: #52525b;
+            --accent: #6366f1; --accent-hover: #818cf8; --accent-dim: rgba(99,102,241,0.12);
+            --success: #22c55e; --success-dim: rgba(34,197,94,0.12);
+            --warning: #f59e0b; --warning-dim: rgba(245,158,11,0.12);
+            --error: #ef4444; --error-dim: rgba(239,68,68,0.12);
+            --border: #27272a; --radius: 8px;
         }
-
-        .light-mode {
-            --bg-primary: #f8f9fa;
-            --bg-secondary: #ffffff;
-            --bg-tertiary: #f1f3f4;
-            --bg-elevated: #ffffff;
-            --text-primary: #1a1a1a;
-            --text-secondary: #5f6368;
-            --text-muted: #9aa0a6;
-            --border: #e0e0e0;
-            --border-light: #d0d0d0;
-            --shadow-sm: 0 1px 2px rgba(0,0,0,0.08);
-            --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
-            --shadow-lg: 0 8px 30px rgba(0,0,0,0.15);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            line-height: 1.5;
-        }
-
-        .app-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 24px;
-            min-height: 100vh;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); color: var(--text-0); height: 100vh; overflow: hidden; }
+        
+        /* Layout */
+        .app { display: grid; grid-template-columns: 280px 1fr 320px; grid-template-rows: 56px 1fr; height: 100vh; }
+        .header { grid-column: 1 / -1; background: var(--bg-1); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+        .sidebar-left { background: var(--bg-1); border-right: 1px solid var(--border); overflow-y: auto; }
+        .main { background: var(--bg-0); display: flex; flex-direction: column; overflow: hidden; }
+        .sidebar-right { background: var(--bg-1); border-left: 1px solid var(--border); overflow-y: auto; }
 
         /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
-            padding-bottom: 24px;
-            border-bottom: 1px solid var(--border);
-        }
+        .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+        .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), #a855f7); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .header-center { display: flex; gap: 8px; }
+        .header-btn { padding: 8px 16px; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-1); font-size: 13px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+        .header-btn:hover { background: var(--bg-4); color: var(--text-0); }
+        .header-btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+        .header-btn.primary:hover { background: var(--accent-hover); }
+        .header-btn.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .status-badge.ready { background: var(--success-dim); color: var(--success); }
+        .status-badge.loading { background: var(--warning-dim); color: var(--warning); }
+        .status-badge.error { background: var(--error-dim); color: var(--error); }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        /* Sidebar Left - Tools */
+        .section { padding: 16px; border-bottom: 1px solid var(--border); }
+        .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+        .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .tool-btn { padding: 10px 8px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-1); font-size: 12px; cursor: pointer; transition: all 0.15s; text-align: center; }
+        .tool-btn:hover { background: var(--bg-3); color: var(--text-0); border-color: var(--accent); }
+        .tool-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+        .tool-btn .icon { font-size: 18px; display: block; margin-bottom: 4px; }
 
-        .logo-icon {
-            width: 42px;
-            height: 42px;
-            background: linear-gradient(135deg, var(--accent), #a855f7);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
+        /* Format selector */
+        .format-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+        .format-tab { flex: 1; padding: 6px; background: var(--bg-2); border: none; border-radius: var(--radius); color: var(--text-2); font-size: 11px; cursor: pointer; transition: all 0.15s; }
+        .format-tab:hover { color: var(--text-1); }
+        .format-tab.active { background: var(--accent); color: white; }
+        .format-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+        .format-btn { padding: 8px 4px; background: var(--bg-2); border: 1px solid transparent; border-radius: var(--radius); color: var(--text-1); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-transform: uppercase; }
+        .format-btn:hover { background: var(--bg-3); border-color: var(--border); }
+        .format-btn.selected { background: var(--accent); color: white; }
 
-        .logo-text {
-            font-size: 24px;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent), #a855f7);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .theme-toggle {
-            width: 40px;
-            height: 40px;
-            border-radius: var(--radius-md);
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            transition: var(--transition);
-        }
-
-        .theme-toggle:hover {
-            background: var(--bg-tertiary);
-            border-color: var(--border-light);
-        }
-
-        /* Main Layout */
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 340px;
-            gap: 24px;
-        }
-
-        @media (max-width: 900px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Drop Zone */
-        .drop-zone {
-            background: var(--bg-secondary);
-            border: 2px dashed var(--border);
-            border-radius: var(--radius-xl);
-            padding: 48px;
-            text-align: center;
-            transition: var(--transition);
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .drop-zone::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, var(--accent-dim), transparent);
-            opacity: 0;
-            transition: var(--transition);
-        }
-
-        .drop-zone:hover,
-        .drop-zone.drag-over {
-            border-color: var(--accent);
-            background: var(--bg-tertiary);
-        }
-
-        .drop-zone:hover::before,
-        .drop-zone.drag-over::before {
-            opacity: 1;
-        }
-
-        .drop-zone-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 20px;
-            background: var(--accent-dim);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 36px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .drop-zone h2 {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .drop-zone p {
-            color: var(--text-secondary);
-            font-size: 14px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .drop-zone input {
-            display: none;
-        }
-
-        .supported-formats {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            justify-content: center;
-            margin-top: 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .format-badge {
-            background: var(--bg-elevated);
-            color: var(--text-secondary);
-            padding: 4px 10px;
-            border-radius: var(--radius-sm);
-            font-size: 11px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        /* Main Area */
+        .drop-zone { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed var(--border); margin: 16px; border-radius: 12px; transition: all 0.2s; cursor: pointer; position: relative; }
+        .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-dim); }
+        .drop-zone.has-files { border-style: solid; cursor: default; }
+        .drop-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.8; }
+        .drop-text { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+        .drop-hint { font-size: 13px; color: var(--text-2); }
+        .drop-zone input { display: none; }
 
         /* File List */
-        .file-list-container {
-            margin-top: 24px;
-        }
-
-        .file-list-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
-        .file-list-header h3 {
-            font-size: 16px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .file-count {
-            background: var(--accent-dim);
-            color: var(--accent);
-            padding: 2px 8px;
-            border-radius: var(--radius-sm);
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .clear-all-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 13px;
-            cursor: pointer;
-            padding: 6px 12px;
-            border-radius: var(--radius-sm);
-            transition: var(--transition);
-        }
-
-        .clear-all-btn:hover {
-            background: var(--error-dim);
-            color: var(--error);
-        }
-
-        .file-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .file-item {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 14px 16px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            transition: var(--transition);
-        }
-
-        .file-item:hover {
-            border-color: var(--border-light);
-        }
-
-        .file-item.converting {
-            border-color: var(--accent);
-            background: linear-gradient(135deg, var(--bg-secondary), var(--accent-dim));
-        }
-
-        .file-item.completed {
-            border-color: var(--success);
-        }
-
-        .file-item.error {
-            border-color: var(--error);
-        }
-
-        .file-icon {
-            width: 44px;
-            height: 44px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
-        }
-
-        .file-icon.image { background: linear-gradient(135deg, #ec4899, #f43f5e); }
-        .file-icon.video { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
-        .file-icon.audio { background: linear-gradient(135deg, #22c55e, #10b981); }
-        .file-icon.document { background: linear-gradient(135deg, #f59e0b, #eab308); }
-
-        .file-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .file-name {
-            font-weight: 500;
-            font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .file-meta {
-            display: flex;
-            gap: 12px;
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-top: 3px;
-        }
-
-        .file-progress {
-            width: 100%;
-            height: 4px;
-            background: var(--bg-tertiary);
-            border-radius: 2px;
-            margin-top: 8px;
-            overflow: hidden;
-        }
-
-        .file-progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent), #a855f7);
-            border-radius: 2px;
-            transition: width 0.3s ease;
-        }
-
-        .file-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .file-action-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-sm);
-            border: none;
-            background: var(--bg-tertiary);
-            color: var(--text-secondary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-        }
-
-        .file-action-btn:hover {
-            background: var(--bg-elevated);
-            color: var(--text-primary);
-        }
-
-        .file-action-btn.download {
-            background: var(--success-dim);
-            color: var(--success);
-        }
-
-        .file-action-btn.download:hover {
-            background: var(--success);
-            color: white;
-        }
-
-        .file-action-btn.remove:hover {
-            background: var(--error-dim);
-            color: var(--error);
-        }
-
-        /* Sidebar */
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 20px;
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
-        .panel-title {
-            font-size: 15px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .panel-icon {
-            width: 28px;
-            height: 28px;
-            background: var(--accent-dim);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-        }
-
-        /* Format Selection */
-        .format-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-        }
-
-        .format-btn {
-            padding: 10px 8px;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: var(--transition);
-            text-transform: uppercase;
-        }
-
-        .format-btn:hover {
-            border-color: var(--accent);
-            background: var(--accent-dim);
-        }
-
-        .format-btn.selected {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: white;
-        }
-
-        .format-category {
-            margin-bottom: 16px;
-        }
-
-        .format-category:last-child {
-            margin-bottom: 0;
-        }
-
-        .format-category-title {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-
-        /* Quality Settings */
-        .setting-group {
-            margin-bottom: 16px;
-        }
-
-        .setting-group:last-child {
-            margin-bottom: 0;
-        }
-
-        .setting-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .setting-label span {
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
-        .setting-value {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--accent);
-        }
-
-        .setting-slider {
-            width: 100%;
-            -webkit-appearance: none;
-            height: 6px;
-            background: var(--bg-tertiary);
-            border-radius: 3px;
-            outline: none;
-        }
-
-        .setting-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            background: var(--accent);
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: var(--shadow-md);
-            transition: var(--transition);
-        }
-
-        .setting-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
-        }
-
-        .setting-select {
-            width: 100%;
-            padding: 10px 12px;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-size: 13px;
-            cursor: pointer;
-            outline: none;
-            transition: var(--transition);
-        }
-
-        .setting-select:hover,
-        .setting-select:focus {
-            border-color: var(--accent);
-        }
-
-        /* Presets */
-        .preset-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .preset-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .preset-item:hover {
-            border-color: var(--accent);
-        }
-
-        .preset-item.selected {
-            border-color: var(--accent);
-            background: var(--accent-dim);
-        }
-
-        .preset-icon {
-            font-size: 16px;
-        }
-
-        .preset-info {
-            flex: 1;
-        }
-
-        .preset-name {
-            font-size: 13px;
-            font-weight: 500;
-        }
-
-        .preset-desc {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        /* Convert Button */
-        .convert-section {
-            margin-top: auto;
-        }
-
-        .convert-btn {
-            width: 100%;
-            padding: 16px 24px;
-            background: linear-gradient(135deg, var(--accent), #a855f7);
-            border: none;
-            border-radius: var(--radius-md);
-            color: white;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .convert-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
-        }
-
-        .convert-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .convert-btn.loading {
-            background: var(--bg-tertiary);
-        }
-
-        /* Loading State */
-        .ffmpeg-loading {
-            text-align: center;
-            padding: 24px;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--bg-tertiary);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 16px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 32px;
-            color: var(--text-muted);
-        }
-
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
-
-        /* Status Messages */
-        .status-message {
-            padding: 12px 16px;
-            border-radius: var(--radius-md);
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-
-        .status-message.info {
-            background: var(--accent-dim);
-            color: var(--accent);
-        }
-
-        .status-message.success {
-            background: var(--success-dim);
-            color: var(--success);
-        }
-
-        .status-message.error {
-            background: var(--error-dim);
-            color: var(--error);
-        }
-
-        /* Toast Notifications */
-        .toast-container {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 1000;
-        }
-
-        .toast {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 14px 18px;
-            box-shadow: var(--shadow-lg);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            animation: slideIn 0.3s ease;
-            max-width: 360px;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(100%);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .toast.success .toast-icon { color: var(--success); }
-        .toast.error .toast-icon { color: var(--error); }
-
-        .toast-content {
-            flex: 1;
-        }
-
-        .toast-title {
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .toast-message {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-top: 2px;
-        }
-
-        /* Preview Modal */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: var(--transition);
-        }
-
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .modal {
-            background: var(--bg-secondary);
-            border-radius: var(--radius-xl);
-            max-width: 800px;
-            width: 90%;
-            max-height: 90vh;
-            overflow: hidden;
-            transform: scale(0.95);
-            transition: var(--transition);
-        }
-
-        .modal-overlay.active .modal {
-            transform: scale(1);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 24px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .modal-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .modal-close {
-            width: 36px;
-            height: 36px;
-            border-radius: var(--radius-sm);
-            border: none;
-            background: var(--bg-tertiary);
-            color: var(--text-secondary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            transition: var(--transition);
-        }
-
-        .modal-close:hover {
-            background: var(--error-dim);
-            color: var(--error);
-        }
-
-        .modal-body {
-            padding: 24px;
-            max-height: calc(90vh - 140px);
-            overflow-y: auto;
-        }
-
-        .preview-content {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 300px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-md);
-        }
-
-        .preview-content img,
-        .preview-content video,
-        .preview-content audio {
-            max-width: 100%;
-            max-height: 60vh;
-            border-radius: var(--radius-sm);
-        }
+        .file-list { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+        .file-list-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; margin: 16px 16px 0; background: var(--bg-2); border-radius: var(--radius) var(--radius) 0 0; }
+        .file-list-header h3 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .file-count { background: var(--accent-dim); color: var(--accent); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+        .file-list-actions { display: flex; gap: 8px; }
+        .file-list-actions button { background: none; border: none; color: var(--text-2); font-size: 12px; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+        .file-list-actions button:hover { background: var(--bg-3); color: var(--text-1); }
+        
+        .file-grid { background: var(--bg-1); border-radius: 0 0 var(--radius) var(--radius); border: 1px solid var(--border); border-top: none; max-height: calc(100vh - 220px); overflow-y: auto; }
+        .file-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+        .file-item:last-child { border-bottom: none; }
+        .file-item:hover { background: var(--bg-2); }
+        .file-item.converting { background: var(--accent-dim); }
+        .file-item.done { background: var(--success-dim); }
+        .file-item.error { background: var(--error-dim); }
+        
+        .file-thumb { width: 40px; height: 40px; background: var(--bg-3); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; overflow: hidden; }
+        .file-thumb img, .file-thumb video { width: 100%; height: 100%; object-fit: cover; }
+        .file-info { flex: 1; min-width: 0; }
+        .file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-meta { font-size: 11px; color: var(--text-2); display: flex; gap: 8px; margin-top: 2px; }
+        .file-progress { height: 3px; background: var(--bg-4); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+        .file-progress-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+        .file-actions { display: flex; gap: 4px; }
+        .file-action { width: 28px; height: 28px; border-radius: 6px; border: none; background: var(--bg-3); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s; }
+        .file-action:hover { background: var(--bg-4); color: var(--text-0); }
+        .file-action.download { background: var(--success-dim); color: var(--success); }
+        .file-action.download:hover { background: var(--success); color: white; }
+
+        /* Sidebar Right - Settings */
+        .setting-group { margin-bottom: 16px; }
+        .setting-group:last-child { margin-bottom: 0; }
+        .setting-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; color: var(--text-1); }
+        .setting-value { color: var(--accent); font-weight: 600; }
+        .setting-slider { width: 100%; height: 4px; -webkit-appearance: none; background: var(--bg-3); border-radius: 2px; outline: none; }
+        .setting-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--accent); border-radius: 50%; cursor: pointer; }
+        .setting-select { width: 100%; padding: 8px 10px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-0); font-size: 12px; cursor: pointer; }
+        .setting-input { width: 100%; padding: 8px 10px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-0); font-size: 12px; }
+        .setting-input:focus, .setting-select:focus { outline: none; border-color: var(--accent); }
+        .setting-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .setting-checkbox { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-1); cursor: pointer; }
+        .setting-checkbox input { accent-color: var(--accent); }
+
+        /* Quick Actions / Presets */
+        .preset-list { display: flex; flex-direction: column; gap: 6px; }
+        .preset-btn { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.15s; text-align: left; }
+        .preset-btn:hover { border-color: var(--accent); background: var(--bg-3); }
+        .preset-btn.active { border-color: var(--accent); background: var(--accent-dim); }
+        .preset-icon { font-size: 20px; }
+        .preset-info { flex: 1; }
+        .preset-name { font-size: 12px; font-weight: 500; color: var(--text-0); }
+        .preset-desc { font-size: 10px; color: var(--text-2); margin-top: 1px; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 4px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        .tab { flex: 1; padding: 8px; background: transparent; border: none; border-radius: var(--radius); color: var(--text-2); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+        .tab:hover { color: var(--text-1); background: var(--bg-2); }
+        .tab.active { color: var(--text-0); background: var(--bg-3); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.2s; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal { background: var(--bg-1); border: 1px solid var(--border); border-radius: 12px; width: 90%; max-width: 600px; max-height: 80vh; overflow: hidden; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+        .modal-title { font-size: 16px; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-2); font-size: 20px; cursor: pointer; padding: 4px; }
+        .modal-close:hover { color: var(--text-0); }
+        .modal-body { padding: 20px; overflow-y: auto; max-height: calc(80vh - 120px); }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+        /* Preview */
+        .preview-container { display: flex; align-items: center; justify-content: center; background: var(--bg-0); border-radius: var(--radius); min-height: 200px; }
+        .preview-container img, .preview-container video { max-width: 100%; max-height: 400px; border-radius: var(--radius); }
+        .preview-container audio { width: 100%; }
+
+        /* Toast */
+        .toast-container { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 1001; }
+        .toast { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--error); }
+        .toast-icon { font-size: 18px; }
+        .toast-text { font-size: 13px; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-1); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+        /* Loading */
+        .loading-overlay { position: absolute; inset: 0; background: var(--bg-1); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 10; }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--bg-4); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         /* Responsive */
-        @media (max-width: 600px) {
-            .app-container {
-                padding: 16px;
-            }
-
-            .header {
-                flex-direction: column;
-                gap: 16px;
-                align-items: flex-start;
-            }
-
-            .drop-zone {
-                padding: 32px 20px;
-            }
-
-            .format-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        @media (max-width: 1100px) {
+            .app { grid-template-columns: 240px 1fr 280px; }
+        }
+        @media (max-width: 900px) {
+            .app { grid-template-columns: 1fr; grid-template-rows: 56px 1fr auto; }
+            .sidebar-left, .sidebar-right { display: none; }
+            .sidebar-right.mobile-open { display: block; position: fixed; bottom: 0; left: 0; right: 0; height: 50vh; z-index: 100; border-top: 1px solid var(--border); border-left: none; }
         }
     </style>
 </head>
 <body>
-    <div class="app-container">
+    <div class="app">
+        <!-- Header -->
         <header class="header">
             <div class="logo">
                 <div class="logo-icon">⚡</div>
-                <span class="logo-text">ConvertFlow</span>
+                <span>ConvertFlow</span>
+            </div>
+            <div class="header-center">
+                <button class="header-btn" onclick="document.getElementById('fileInput').click()">
+                    <span>📁</span> Add Files
+                </button>
+                <button class="header-btn" onclick="addFromUrl()">
+                    <span>🔗</span> From URL
+                </button>
+                <button class="header-btn primary" id="convertBtn" onclick="convertAll()" disabled>
+                    <span>⚡</span> Convert All
+                </button>
             </div>
             <div class="header-actions">
-                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+                <span class="status-badge loading" id="statusBadge">Loading...</span>
+                <button class="header-btn" onclick="showSettings()" title="Settings">⚙️</button>
             </div>
         </header>
 
-        <main class="main-content">
-            <section class="converter-area">
-                <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                    <div class="drop-zone-icon">📁</div>
-                    <h2>Drop files here or click to browse</h2>
-                    <p>Convert videos, audio, images, and documents locally in your browser</p>
-                    <div class="supported-formats">
-                        <span class="format-badge">MP4</span>
-                        <span class="format-badge">WebM</span>
-                        <span class="format-badge">MP3</span>
-                        <span class="format-badge">WAV</span>
-                        <span class="format-badge">GIF</span>
-                        <span class="format-badge">PNG</span>
-                        <span class="format-badge">JPG</span>
-                        <span class="format-badge">WebP</span>
-                    </div>
-                    <input type="file" id="fileInput" multiple accept="video/*,audio/*,image/*">
-                </div>
-
-                <div class="file-list-container" id="fileListContainer" style="display: none;">
-                    <div class="file-list-header">
-                        <h3>
-                            Files 
-                            <span class="file-count" id="fileCount">0</span>
-                        </h3>
-                        <button class="clear-all-btn" onclick="clearAllFiles()">Clear All</button>
-                    </div>
-                    <div class="file-list" id="fileList"></div>
-                </div>
-            </section>
-
-            <aside class="sidebar">
-                <div class="panel" id="ffmpegStatus">
-                    <div class="ffmpeg-loading">
-                        <div class="spinner"></div>
-                        <div class="loading-text">Loading FFmpeg...</div>
-                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">This may take a moment on first load (~25MB)</p>
-                    </div>
-                </div>
-
-                <div class="panel" id="formatPanel" style="display: none;">
-                    <div class="panel-header">
-                        <div class="panel-title">
-                            <div class="panel-icon">🎯</div>
-                            Output Format
-                        </div>
-                    </div>
-                    
-                    <div class="format-category">
-                        <div class="format-category-title">Video</div>
-                        <div class="format-grid">
-                            <button class="format-btn" data-format="mp4" data-type="video">MP4</button>
-                            <button class="format-btn" data-format="webm" data-type="video">WebM</button>
-                            <button class="format-btn" data-format="avi" data-type="video">AVI</button>
-                            <button class="format-btn" data-format="mov" data-type="video">MOV</button>
-                            <button class="format-btn" data-format="mkv" data-type="video">MKV</button>
-                            <button class="format-btn" data-format="gif" data-type="video">GIF</button>
-                        </div>
-                    </div>
-
-                    <div class="format-category">
-                        <div class="format-category-title">Audio</div>
-                        <div class="format-grid">
-                            <button class="format-btn" data-format="mp3" data-type="audio">MP3</button>
-                            <button class="format-btn" data-format="wav" data-type="audio">WAV</button>
-                            <button class="format-btn" data-format="ogg" data-type="audio">OGG</button>
-                            <button class="format-btn" data-format="aac" data-type="audio">AAC</button>
-                            <button class="format-btn" data-format="flac" data-type="audio">FLAC</button>
-                            <button class="format-btn" data-format="m4a" data-type="audio">M4A</button>
-                        </div>
-                    </div>
-
-                    <div class="format-category">
-                        <div class="format-category-title">Image</div>
-                        <div class="format-grid">
-                            <button class="format-btn" data-format="png" data-type="image">PNG</button>
-                            <button class="format-btn" data-format="jpg" data-type="image">JPG</button>
-                            <button class="format-btn" data-format="webp" data-type="image">WebP</button>
-                            <button class="format-btn" data-format="bmp" data-type="image">BMP</button>
-                            <button class="format-btn" data-format="ico" data-type="image">ICO</button>
-                            <button class="format-btn" data-format="tiff" data-type="image">TIFF</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="panel" id="settingsPanel" style="display: none;">
-                    <div class="panel-header">
-                        <div class="panel-title">
-                            <div class="panel-icon">⚙️</div>
-                            Quality Settings
-                        </div>
-                    </div>
-
-                    <div class="setting-group" id="videoSettings" style="display: none;">
-                        <div class="setting-label">
-                            <span>Video Quality</span>
-                            <span class="setting-value" id="videoQualityValue">High</span>
-                        </div>
-                        <input type="range" class="setting-slider" id="videoQuality" min="1" max="5" value="4">
-                        
-                        <div class="setting-label" style="margin-top: 16px;">
-                            <span>Resolution</span>
-                        </div>
-                        <select class="setting-select" id="videoResolution">
-                            <option value="original">Original</option>
-                            <option value="1920x1080">1080p (1920×1080)</option>
-                            <option value="1280x720">720p (1280×720)</option>
-                            <option value="854x480">480p (854×480)</option>
-                            <option value="640x360">360p (640×360)</option>
-                        </select>
-                    </div>
-
-                    <div class="setting-group" id="audioSettings" style="display: none;">
-                        <div class="setting-label">
-                            <span>Audio Bitrate</span>
-                            <span class="setting-value" id="audioBitrateValue">192 kbps</span>
-                        </div>
-                        <input type="range" class="setting-slider" id="audioBitrate" min="1" max="5" value="3">
-                        
-                        <div class="setting-label" style="margin-top: 16px;">
-                            <span>Sample Rate</span>
-                        </div>
-                        <select class="setting-select" id="audioSampleRate">
-                            <option value="original">Original</option>
-                            <option value="48000">48 kHz</option>
-                            <option value="44100" selected>44.1 kHz</option>
-                            <option value="22050">22.05 kHz</option>
-                        </select>
-                    </div>
-
-                    <div class="setting-group" id="imageSettings" style="display: none;">
-                        <div class="setting-label">
-                            <span>Image Quality</span>
-                            <span class="setting-value" id="imageQualityValue">90%</span>
-                        </div>
-                        <input type="range" class="setting-slider" id="imageQuality" min="10" max="100" value="90">
-                        
-                        <div class="setting-label" style="margin-top: 16px;">
-                            <span>Resize</span>
-                        </div>
-                        <select class="setting-select" id="imageResize">
-                            <option value="original">Original Size</option>
-                            <option value="50%">50%</option>
-                            <option value="75%">75%</option>
-                            <option value="150%">150%</option>
-                            <option value="200%">200%</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="panel" id="presetsPanel" style="display: none;">
-                    <div class="panel-header">
-                        <div class="panel-title">
-                            <div class="panel-icon">⭐</div>
-                            Quick Presets
-                        </div>
-                    </div>
-
-                    <div class="preset-list">
-                        <div class="preset-item" data-preset="web-video">
-                            <span class="preset-icon">🌐</span>
-                            <div class="preset-info">
-                                <div class="preset-name">Web Optimized</div>
-                                <div class="preset-desc">MP4 H.264, balanced quality</div>
-                            </div>
-                        </div>
-                        <div class="preset-item" data-preset="social-media">
-                            <span class="preset-icon">📱</span>
-                            <div class="preset-info">
-                                <div class="preset-name">Social Media</div>
-                                <div class="preset-desc">Square 1080×1080, fast upload</div>
-                            </div>
-                        </div>
-                        <div class="preset-item" data-preset="audio-extract">
-                            <span class="preset-icon">🎵</span>
-                            <div class="preset-info">
-                                <div class="preset-name">Extract Audio</div>
-                                <div class="preset-desc">MP3 320kbps from video</div>
-                            </div>
-                        </div>
-                        <div class="preset-item" data-preset="compress">
-                            <span class="preset-icon">📦</span>
-                            <div class="preset-info">
-                                <div class="preset-name">Compress</div>
-                                <div class="preset-desc">Reduce file size significantly</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="convert-section">
-                    <button class="convert-btn" id="convertBtn" disabled onclick="convertFiles()">
-                        <span>⚡</span>
-                        <span>Convert Files</span>
+        <!-- Left Sidebar - Tools -->
+        <aside class="sidebar-left">
+            <div class="section">
+                <div class="section-title">Quick Tools</div>
+                <div class="tool-grid">
+                    <button class="tool-btn active" onclick="setTool('convert')" data-tool="convert">
+                        <span class="icon">🔄</span>Convert
+                    </button>
+                    <button class="tool-btn" onclick="setTool('compress')" data-tool="compress">
+                        <span class="icon">📦</span>Compress
+                    </button>
+                    <button class="tool-btn" onclick="setTool('extract')" data-tool="extract">
+                        <span class="icon">🎵</span>Extract
+                    </button>
+                    <button class="tool-btn" onclick="setTool('resize')" data-tool="resize">
+                        <span class="icon">📐</span>Resize
+                    </button>
+                    <button class="tool-btn" onclick="setTool('trim')" data-tool="trim">
+                        <span class="icon">✂️</span>Trim
+                    </button>
+                    <button class="tool-btn" onclick="setTool('gif')" data-tool="gif">
+                        <span class="icon">🎞️</span>GIF
                     </button>
                 </div>
-            </aside>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Output Format</div>
+                <div class="format-tabs">
+                    <button class="format-tab active" onclick="setFormatTab('video')" data-tab="video">Video</button>
+                    <button class="format-tab" onclick="setFormatTab('audio')" data-tab="audio">Audio</button>
+                    <button class="format-tab" onclick="setFormatTab('image')" data-tab="image">Image</button>
+                </div>
+                <div class="format-grid" id="formatGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Presets</div>
+                <div class="preset-list">
+                    <button class="preset-btn" onclick="applyPreset('web')">
+                        <span class="preset-icon">🌐</span>
+                        <div class="preset-info">
+                            <div class="preset-name">Web Optimized</div>
+                            <div class="preset-desc">MP4 H.264, balanced quality</div>
+                        </div>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('mobile')">
+                        <span class="preset-icon">📱</span>
+                        <div class="preset-info">
+                            <div class="preset-name">Mobile Friendly</div>
+                            <div class="preset-desc">720p, fast loading</div>
+                        </div>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('hq')">
+                        <span class="preset-icon">💎</span>
+                        <div class="preset-info">
+                            <div class="preset-name">High Quality</div>
+                            <div class="preset-desc">Maximum quality, larger size</div>
+                        </div>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('tiny')">
+                        <span class="preset-icon">🗜️</span>
+                        <div class="preset-info">
+                            <div class="preset-name">Tiny Size</div>
+                            <div class="preset-desc">Maximum compression</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Area -->
+        <main class="main">
+            <div class="drop-zone" id="dropZone" onclick="if(!files.length) document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" multiple accept="video/*,audio/*,image/*,.mkv,.avi,.mov,.webm,.flv,.wmv,.m4v,.3gp,.flac,.aac,.ogg,.wma,.m4a">
+                
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="spinner"></div>
+                    <div style="color: var(--text-1); font-size: 14px;">Loading FFmpeg...</div>
+                </div>
+
+                <div id="emptyState">
+                    <div class="drop-icon">📂</div>
+                    <div class="drop-text">Drop files here to convert</div>
+                    <div class="drop-hint">or click to browse • Supports video, audio, images</div>
+                </div>
+
+                <div id="fileListWrapper" style="display: none; width: 100%; height: 100%;">
+                    <div class="file-list-header">
+                        <h3>Files <span class="file-count" id="fileCount">0</span></h3>
+                        <div class="file-list-actions">
+                            <button onclick="event.stopPropagation(); document.getElementById('fileInput').click()">+ Add More</button>
+                            <button onclick="event.stopPropagation(); clearAll()">Clear All</button>
+                        </div>
+                    </div>
+                    <div class="file-grid" id="fileList"></div>
+                </div>
+            </div>
         </main>
+
+        <!-- Right Sidebar - Settings -->
+        <aside class="sidebar-right">
+            <div class="tabs">
+                <button class="tab active" onclick="setSettingsTab('output')" data-tab="output">Output</button>
+                <button class="tab" onclick="setSettingsTab('video')" data-tab="video">Video</button>
+                <button class="tab" onclick="setSettingsTab('audio')" data-tab="audio">Audio</button>
+                <button class="tab" onclick="setSettingsTab('advanced')" data-tab="advanced">Advanced</button>
+            </div>
+
+            <div class="section tab-content active" id="tab-output">
+                <div class="setting-group">
+                    <div class="setting-label"><span>Quality Preset</span></div>
+                    <select class="setting-select" id="qualityPreset" onchange="updateQuality()">
+                        <option value="5">Best (Slow)</option>
+                        <option value="4" selected>High</option>
+                        <option value="3">Good (Balanced)</option>
+                        <option value="2">Medium</option>
+                        <option value="1">Low (Fast)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label"><span>Resolution</span></div>
+                    <select class="setting-select" id="resolution">
+                        <option value="">Original</option>
+                        <option value="3840:2160">4K (3840×2160)</option>
+                        <option value="1920:1080">1080p (1920×1080)</option>
+                        <option value="1280:720">720p (1280×720)</option>
+                        <option value="854:480">480p (854×480)</option>
+                        <option value="640:360">360p (640×360)</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                </div>
+                <div class="setting-group" id="customResGroup" style="display: none;">
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label"><span>Width</span></div>
+                            <input type="number" class="setting-input" id="customWidth" placeholder="1920">
+                        </div>
+                        <div>
+                            <div class="setting-label"><span>Height</span></div>
+                            <input type="number" class="setting-input" id="customHeight" placeholder="1080">
+                        </div>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-checkbox">
+                        <input type="checkbox" id="keepAspect" checked> Maintain aspect ratio
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-checkbox">
+                        <input type="checkbox" id="stripMetadata"> Strip metadata
+                    </label>
+                </div>
+            </div>
+
+            <div class="section tab-content" id="tab-video">
+                <div class="setting-group">
+                    <div class="setting-label"><span>Video Codec</span></div>
+                    <select class="setting-select" id="videoCodec">
+                        <option value="libx264">H.264 (Most Compatible)</option>
+                        <option value="libx265">H.265/HEVC (Better Compression)</option>
+                        <option value="libvpx-vp9">VP9 (WebM)</option>
+                        <option value="copy">Copy (No Re-encode)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label">
+                        <span>Bitrate</span>
+                        <span class="setting-value" id="videoBitrateValue">Auto</span>
+                    </div>
+                    <input type="range" class="setting-slider" id="videoBitrate" min="0" max="10" value="0" oninput="updateVideoBitrate()">
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label"><span>Frame Rate</span></div>
+                    <select class="setting-select" id="frameRate">
+                        <option value="">Original</option>
+                        <option value="60">60 fps</option>
+                        <option value="30">30 fps</option>
+                        <option value="24">24 fps</option>
+                        <option value="15">15 fps</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-checkbox">
+                        <input type="checkbox" id="twoPass"> Two-pass encoding (Better quality)
+                    </label>
+                </div>
+            </div>
+
+            <div class="section tab-content" id="tab-audio">
+                <div class="setting-group">
+                    <div class="setting-label"><span>Audio Codec</span></div>
+                    <select class="setting-select" id="audioCodec">
+                        <option value="aac">AAC</option>
+                        <option value="libmp3lame">MP3</option>
+                        <option value="libvorbis">Vorbis (OGG)</option>
+                        <option value="flac">FLAC (Lossless)</option>
+                        <option value="copy">Copy (No Re-encode)</option>
+                        <option value="none">No Audio</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label">
+                        <span>Audio Bitrate</span>
+                        <span class="setting-value" id="audioBitrateValue">192 kbps</span>
+                    </div>
+                    <input type="range" class="setting-slider" id="audioBitrate" min="1" max="5" value="3" oninput="updateAudioBitrate()">
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label"><span>Sample Rate</span></div>
+                    <select class="setting-select" id="sampleRate">
+                        <option value="">Original</option>
+                        <option value="48000">48 kHz</option>
+                        <option value="44100">44.1 kHz</option>
+                        <option value="22050">22.05 kHz</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label"><span>Channels</span></div>
+                    <select class="setting-select" id="audioChannels">
+                        <option value="">Original</option>
+                        <option value="2">Stereo</option>
+                        <option value="1">Mono</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-checkbox">
+                        <input type="checkbox" id="normalizeAudio"> Normalize audio levels
+                    </label>
+                </div>
+            </div>
+
+            <div class="section tab-content" id="tab-advanced">
+                <div class="setting-group">
+                    <div class="setting-label"><span>Trim Start (seconds)</span></div>
+                    <input type="number" class="setting-input" id="trimStart" placeholder="0" min="0" step="0.1">
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label"><span>Trim End (seconds)</span></div>
+                    <input type="number" class="setting-input" id="trimEnd" placeholder="Leave blank for end" min="0" step="0.1">
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label"><span>Playback Speed</span></div>
+                    <select class="setting-select" id="speed">
+                        <option value="">Normal (1x)</option>
+                        <option value="0.5">0.5x (Slow)</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x (Fast)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label"><span>Rotation</span></div>
+                    <select class="setting-select" id="rotation">
+                        <option value="">None</option>
+                        <option value="90">90° Clockwise</option>
+                        <option value="180">180°</option>
+                        <option value="270">90° Counter-clockwise</option>
+                        <option value="hflip">Flip Horizontal</option>
+                        <option value="vflip">Flip Vertical</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label"><span>Custom FFmpeg Args</span></div>
+                    <input type="text" class="setting-input" id="customArgs" placeholder="-vf eq=brightness=0.1">
+                </div>
+            </div>
+        </aside>
     </div>
 
-    <div class="toast-container" id="toastContainer"></div>
-
-    <div class="modal-overlay" id="previewModal">
+    <!-- Preview Modal -->
+    <div class="modal-overlay" id="previewModal" onclick="if(event.target===this)closeModal()">
         <div class="modal">
             <div class="modal-header">
                 <h3 class="modal-title" id="previewTitle">Preview</h3>
-                <button class="modal-close" onclick="closePreview()">✕</button>
+                <button class="modal-close" onclick="closeModal()">✕</button>
             </div>
             <div class="modal-body">
-                <div class="preview-content" id="previewContent"></div>
+                <div class="preview-container" id="previewContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="header-btn" onclick="closeModal()">Close</button>
+                <button class="header-btn primary" id="previewDownload" onclick="downloadPreview()">⬇ Download</button>
             </div>
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Settings</h3>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label class="setting-checkbox">
+                        <input type="checkbox" id="autoDownload"> Auto-download when conversion completes
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-checkbox">
+                        <input type="checkbox" id="showNotifications" checked> Show notifications
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-checkbox">
+                        <input type="checkbox" id="preserveFiles"> Keep original files in list after conversion
+                    </label>
+                </div>
+                <div class="setting-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                    <div class="setting-label"><span>FFmpeg Status</span></div>
+                    <div id="ffmpegInfo" style="font-size: 12px; color: var(--text-2);"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
     <script>
-        // State
-        let ffmpeg = null;
-        let ffmpegLoaded = false;
-        let files = [];
-        let selectedFormat = null;
-        let selectedType = null;
-        let isConverting = false;
+        // ===== State =====
+        let ffmpeg = null, ffmpegLoaded = false, files = [], currentTool = 'convert', currentFormatTab = 'video', selectedFormat = 'mp4';
+        let previewFileId = null;
 
-        // Quality mappings
-        const videoQualityLabels = ['Low', 'Medium', 'Good', 'High', 'Best'];
-        const videoCRF = [35, 28, 23, 20, 16];
-        const audioBitrateLabels = ['96 kbps', '128 kbps', '192 kbps', '256 kbps', '320 kbps'];
-        const audioBitrateValues = [96, 128, 192, 256, 320];
+        const formats = {
+            video: ['mp4', 'webm', 'mkv', 'avi', 'mov', 'gif', 'ts', 'flv', 'wmv'],
+            audio: ['mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a', 'wma', 'opus'],
+            image: ['jpg', 'png', 'webp', 'bmp', 'gif', 'tiff', 'ico']
+        };
 
-        // Initialize
+        const qualityCRF = { 1: 35, 2: 28, 3: 23, 4: 20, 5: 16 };
+        const audioBitrates = ['96', '128', '192', '256', '320'];
+        const videoBitrates = ['Auto', '1M', '2M', '4M', '6M', '8M', '10M', '15M', '20M', '30M', '50M'];
+
+        // ===== Init =====
         document.addEventListener('DOMContentLoaded', async () => {
-            await initFFmpeg();
             setupEventListeners();
-            loadTheme();
+            renderFormats();
+            await initFFmpeg();
         });
 
-        // FFmpeg initialization (using 0.10.x API with coi-serviceworker for SharedArrayBuffer)
         async function initFFmpeg() {
-            // Wait for service worker setup to complete
-            const coiResult = await window.coiReady;
+            await window.coiReady;
             
-            // Check if SharedArrayBuffer is available
             if (typeof SharedArrayBuffer === 'undefined') {
-                const isHttps = window.location.protocol === 'https:';
-                const hasServiceWorker = 'serviceWorker' in navigator;
-                
-                let errorMsg = 'SharedArrayBuffer is not available. ';
-                if (!isHttps && window.location.hostname !== 'localhost') {
-                    errorMsg += 'Please use HTTPS.';
-                } else if (!hasServiceWorker) {
-                    errorMsg += 'Your browser does not support Service Workers.';
-                } else if (!navigator.serviceWorker.controller) {
-                    errorMsg += 'Please refresh the page to complete setup.';
-                } else {
-                    errorMsg += 'Your browser may not support cross-origin isolation. Try Chrome 92+, Firefox 79+, or Edge 92+.';
-                }
-                
-                document.getElementById('ffmpegStatus').innerHTML = `
-                    <div class="status-message error">
-                        <span>⚠️</span>
-                        <div>
-                            <strong>Setup Required</strong><br>
-                            <span style="font-size: 12px;">${errorMsg}</span>
-                        </div>
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                        <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Setup Required</div>
+                        <div style="font-size: 13px; color: var(--text-2); margin-bottom: 16px;">Please refresh the page to complete setup</div>
+                        <button class="header-btn primary" onclick="location.reload()">Refresh Page</button>
                     </div>
-                    <button onclick="window.location.reload()" style="width: 100%; margin-top: 12px; padding: 10px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: white; cursor: pointer; font-weight: 500;">
-                        Reload Page
-                    </button>
                 `;
+                document.getElementById('statusBadge').textContent = 'Setup Required';
+                document.getElementById('statusBadge').className = 'status-badge error';
                 return;
             }
-            
+
             try {
-                const { createFFmpeg, fetchFile: ffFetchFile } = FFmpeg;
-                
+                const { createFFmpeg, fetchFile } = FFmpeg;
                 ffmpeg = createFFmpeg({
                     log: true,
                     corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js',
-                    progress: ({ ratio }) => {
-                        updateProgress(Math.round(ratio * 100));
-                    }
+                    progress: ({ ratio }) => updateConversionProgress(Math.round(ratio * 100))
                 });
-
-                // Store fetchFile for later use
-                window.ffmpegFetchFile = ffFetchFile;
-
+                window.ffmpegFetchFile = fetchFile;
                 await ffmpeg.load();
-
                 ffmpegLoaded = true;
-                document.getElementById('ffmpegStatus').innerHTML = `
-                    <div class="status-message success">
-                        <span>✓</span>
-                        <span>FFmpeg loaded - Ready to convert!</span>
+                
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('statusBadge').textContent = 'Ready';
+                document.getElementById('statusBadge').className = 'status-badge ready';
+                document.getElementById('ffmpegInfo').textContent = 'FFmpeg.wasm v0.10.1 loaded successfully';
+            } catch (err) {
+                console.error('FFmpeg load error:', err);
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                        <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Failed to Load</div>
+                        <div style="font-size: 13px; color: var(--text-2);">${err.message}</div>
                     </div>
                 `;
-                document.getElementById('formatPanel').style.display = 'block';
-                document.getElementById('presetsPanel').style.display = 'block';
-                showToast('success', 'Ready!', 'FFmpeg loaded successfully');
-            } catch (error) {
-                console.error('FFmpeg load error:', error);
-                document.getElementById('ffmpegStatus').innerHTML = `
-                    <div class="status-message error">
-                        <span>✕</span>
-                        <span>Failed to load FFmpeg. Please refresh.</span>
-                    </div>
-                `;
-                showToast('error', 'Error', 'Failed to load FFmpeg');
+                document.getElementById('statusBadge').textContent = 'Error';
+                document.getElementById('statusBadge').className = 'status-badge error';
             }
         }
 
-        // Event Listeners
+        // ===== Event Listeners =====
         function setupEventListeners() {
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
 
-            // Drag and drop
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('drag-over');
+            dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+            dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+            fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+            document.getElementById('resolution').addEventListener('change', e => {
+                document.getElementById('customResGroup').style.display = e.target.value === 'custom' ? 'block' : 'none';
             });
 
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('drag-over');
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('drag-over');
-                handleFiles(e.dataTransfer.files);
-            });
-
-            // File input
-            fileInput.addEventListener('change', (e) => {
-                handleFiles(e.target.files);
-            });
-
-            // Format buttons
-            document.querySelectorAll('.format-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('selected'));
-                    btn.classList.add('selected');
-                    selectedFormat = btn.dataset.format;
-                    selectedType = btn.dataset.type;
-                    updateSettingsPanel();
-                    updateConvertButton();
-                });
-            });
-
-            // Preset buttons
-            document.querySelectorAll('.preset-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    document.querySelectorAll('.preset-item').forEach(p => p.classList.remove('selected'));
-                    item.classList.add('selected');
-                    applyPreset(item.dataset.preset);
-                });
-            });
-
-            // Quality sliders
-            document.getElementById('videoQuality').addEventListener('input', (e) => {
-                document.getElementById('videoQualityValue').textContent = videoQualityLabels[e.target.value - 1];
-            });
-
-            document.getElementById('audioBitrate').addEventListener('input', (e) => {
-                document.getElementById('audioBitrateValue').textContent = audioBitrateLabels[e.target.value - 1];
-            });
-
-            document.getElementById('imageQuality').addEventListener('input', (e) => {
-                document.getElementById('imageQualityValue').textContent = e.target.value + '%';
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape') closeModal();
+                if (e.ctrlKey && e.key === 'Enter' && files.length && ffmpegLoaded) convertAll();
             });
         }
 
-        // File handling
+        // ===== File Handling =====
         function handleFiles(fileList) {
             for (const file of fileList) {
-                const fileType = getFileType(file);
-                if (fileType) {
-                    files.push({
-                        id: Date.now() + Math.random(),
-                        file: file,
-                        name: file.name,
-                        size: file.size,
-                        type: fileType,
-                        status: 'pending',
-                        progress: 0,
-                        converted: null
-                    });
+                const type = getFileType(file);
+                if (type) {
+                    const id = Date.now() + Math.random();
+                    const thumb = type === 'image' || type === 'video' ? URL.createObjectURL(file) : null;
+                    files.push({ id, file, name: file.name, size: file.size, type, status: 'pending', progress: 0, thumb, converted: null });
                 }
             }
-            renderFileList();
-            updateConvertButton();
+            renderFiles();
+            updateUI();
         }
 
         function getFileType(file) {
-            const type = file.type.split('/')[0];
-            if (['video', 'audio', 'image'].includes(type)) return type;
+            const ext = file.name.split('.').pop().toLowerCase();
+            const videoExts = ['mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'm4v', '3gp', 'ts'];
+            const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'opus'];
+            const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'ico'];
+            if (videoExts.includes(ext) || file.type.startsWith('video/')) return 'video';
+            if (audioExts.includes(ext) || file.type.startsWith('audio/')) return 'audio';
+            if (imageExts.includes(ext) || file.type.startsWith('image/')) return 'image';
             return null;
         }
 
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
 
-        function renderFileList() {
-            const container = document.getElementById('fileListContainer');
+        function renderFiles() {
             const list = document.getElementById('fileList');
-            const count = document.getElementById('fileCount');
+            const wrapper = document.getElementById('fileListWrapper');
+            const empty = document.getElementById('emptyState');
+            const dropZone = document.getElementById('dropZone');
 
             if (files.length === 0) {
-                container.style.display = 'none';
+                wrapper.style.display = 'none';
+                empty.style.display = 'block';
+                dropZone.classList.remove('has-files');
                 return;
             }
 
-            container.style.display = 'block';
-            count.textContent = files.length;
+            wrapper.style.display = 'block';
+            empty.style.display = 'none';
+            dropZone.classList.add('has-files');
+            document.getElementById('fileCount').textContent = files.length;
 
             list.innerHTML = files.map(f => `
                 <div class="file-item ${f.status}" data-id="${f.id}">
-                    <div class="file-icon ${f.type}">
-                        ${f.type === 'video' ? '🎬' : f.type === 'audio' ? '🎵' : '🖼️'}
+                    <div class="file-thumb">
+                        ${f.thumb && f.type === 'image' ? `<img src="${f.thumb}" alt="">` : 
+                          f.thumb && f.type === 'video' ? `<video src="${f.thumb}" muted></video>` :
+                          f.type === 'video' ? '🎬' : f.type === 'audio' ? '🎵' : '🖼️'}
                     </div>
                     <div class="file-info">
                         <div class="file-name">${f.name}</div>
                         <div class="file-meta">
-                            <span>${formatFileSize(f.size)}</span>
+                            <span>${formatSize(f.size)}</span>
                             <span>${f.type}</span>
-                            ${f.status === 'completed' && f.convertedSize ? `<span>→ ${formatFileSize(f.convertedSize)}</span>` : ''}
+                            ${f.status === 'done' ? `<span style="color:var(--success)">→ ${formatSize(f.convertedSize)}</span>` : ''}
+                            ${f.status === 'converting' ? `<span style="color:var(--accent)">${f.progress}%</span>` : ''}
                         </div>
-                        ${f.status === 'converting' ? `
-                            <div class="file-progress">
-                                <div class="file-progress-bar" style="width: ${f.progress}%"></div>
-                            </div>
-                        ` : ''}
+                        ${f.status === 'converting' ? `<div class="file-progress"><div class="file-progress-bar" style="width:${f.progress}%"></div></div>` : ''}
                     </div>
                     <div class="file-actions">
-                        ${f.status === 'completed' ? `
-                            <button class="file-action-btn download" onclick="downloadFile('${f.id}')" title="Download">⬇</button>
-                            <button class="file-action-btn" onclick="previewFile('${f.id}')" title="Preview">👁</button>
+                        ${f.status === 'done' ? `
+                            <button class="file-action download" onclick="event.stopPropagation();downloadFile('${f.id}')" title="Download">⬇</button>
+                            <button class="file-action" onclick="event.stopPropagation();previewFile('${f.id}')" title="Preview">👁</button>
                         ` : ''}
-                        <button class="file-action-btn remove" onclick="removeFile('${f.id}')" title="Remove">✕</button>
+                        <button class="file-action" onclick="event.stopPropagation();removeFile('${f.id}')" title="Remove">✕</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        function removeFile(id) {
-            files = files.filter(f => f.id != id);
-            renderFileList();
-            updateConvertButton();
+        function removeFile(id) { files = files.filter(f => f.id != id); renderFiles(); updateUI(); }
+        function clearAll() { files = []; renderFiles(); updateUI(); }
+        function updateUI() { document.getElementById('convertBtn').disabled = !ffmpegLoaded || files.length === 0 || files.every(f => f.status === 'done'); }
+
+        // ===== Tools & Formats =====
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+            
+            // Auto-select appropriate format
+            if (tool === 'extract') { setFormatTab('audio'); selectFormat('mp3'); }
+            else if (tool === 'gif') { setFormatTab('video'); selectFormat('gif'); }
+            else if (tool === 'resize' && currentFormatTab === 'audio') { setFormatTab('video'); }
         }
 
-        function clearAllFiles() {
-            files = [];
-            renderFileList();
-            updateConvertButton();
+        function setFormatTab(tab) {
+            currentFormatTab = tab;
+            document.querySelectorAll('.format-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            renderFormats();
         }
 
-        // Settings
-        function updateSettingsPanel() {
-            const panel = document.getElementById('settingsPanel');
-            const videoSettings = document.getElementById('videoSettings');
-            const audioSettings = document.getElementById('audioSettings');
-            const imageSettings = document.getElementById('imageSettings');
-
-            panel.style.display = 'block';
-            videoSettings.style.display = 'none';
-            audioSettings.style.display = 'none';
-            imageSettings.style.display = 'none';
-
-            if (selectedType === 'video') {
-                videoSettings.style.display = 'block';
-            } else if (selectedType === 'audio') {
-                audioSettings.style.display = 'block';
-            } else if (selectedType === 'image') {
-                imageSettings.style.display = 'block';
-            }
+        function renderFormats() {
+            const grid = document.getElementById('formatGrid');
+            grid.innerHTML = formats[currentFormatTab].map(f => 
+                `<button class="format-btn ${f === selectedFormat ? 'selected' : ''}" onclick="selectFormat('${f}')">${f}</button>`
+            ).join('');
         }
 
+        function selectFormat(fmt) {
+            selectedFormat = fmt;
+            renderFormats();
+        }
+
+        // ===== Presets =====
         function applyPreset(preset) {
-            switch (preset) {
-                case 'web-video':
-                    selectFormat('mp4', 'video');
-                    document.getElementById('videoQuality').value = 3;
-                    document.getElementById('videoQualityValue').textContent = 'Good';
-                    document.getElementById('videoResolution').value = '1280x720';
-                    break;
-                case 'social-media':
-                    selectFormat('mp4', 'video');
-                    document.getElementById('videoQuality').value = 4;
-                    document.getElementById('videoQualityValue').textContent = 'High';
-                    break;
-                case 'audio-extract':
-                    selectFormat('mp3', 'audio');
-                    document.getElementById('audioBitrate').value = 5;
-                    document.getElementById('audioBitrateValue').textContent = '320 kbps';
-                    break;
-                case 'compress':
-                    selectFormat('mp4', 'video');
-                    document.getElementById('videoQuality').value = 2;
-                    document.getElementById('videoQualityValue').textContent = 'Medium';
-                    document.getElementById('videoResolution').value = '854x480';
-                    break;
-            }
-            updateConvertButton();
-        }
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            event.target.closest('.preset-btn').classList.add('active');
 
-        function selectFormat(format, type) {
-            document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('selected'));
-            const btn = document.querySelector(`.format-btn[data-format="${format}"]`);
-            if (btn) {
-                btn.classList.add('selected');
-                selectedFormat = format;
-                selectedType = type;
-                updateSettingsPanel();
+            switch(preset) {
+                case 'web':
+                    selectFormat('mp4');
+                    document.getElementById('qualityPreset').value = '3';
+                    document.getElementById('resolution').value = '1280:720';
+                    document.getElementById('videoCodec').value = 'libx264';
+                    break;
+                case 'mobile':
+                    selectFormat('mp4');
+                    document.getElementById('qualityPreset').value = '2';
+                    document.getElementById('resolution').value = '854:480';
+                    break;
+                case 'hq':
+                    selectFormat('mp4');
+                    document.getElementById('qualityPreset').value = '5';
+                    document.getElementById('resolution').value = '';
+                    break;
+                case 'tiny':
+                    selectFormat('mp4');
+                    document.getElementById('qualityPreset').value = '1';
+                    document.getElementById('resolution').value = '640:360';
+                    break;
             }
         }
 
-        function updateConvertButton() {
-            const btn = document.getElementById('convertBtn');
-            btn.disabled = !ffmpegLoaded || files.length === 0 || !selectedFormat || isConverting;
+        // ===== Settings UI =====
+        function setSettingsTab(tab) {
+            document.querySelectorAll('.sidebar-right .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            document.querySelectorAll('.sidebar-right .tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
         }
 
-        function updateProgress(progress) {
-            const convertingFile = files.find(f => f.status === 'converting');
-            if (convertingFile) {
-                convertingFile.progress = progress;
-                renderFileList();
+        function updateVideoBitrate() {
+            const val = document.getElementById('videoBitrate').value;
+            document.getElementById('videoBitrateValue').textContent = videoBitrates[val];
+        }
+
+        function updateAudioBitrate() {
+            const val = document.getElementById('audioBitrate').value;
+            document.getElementById('audioBitrateValue').textContent = audioBitrates[val - 1] + ' kbps';
+        }
+
+        // ===== Conversion =====
+        async function convertAll() {
+            if (!ffmpegLoaded || files.length === 0) return;
+
+            document.getElementById('convertBtn').disabled = true;
+            document.getElementById('statusBadge').textContent = 'Converting...';
+            document.getElementById('statusBadge').className = 'status-badge loading';
+
+            for (const f of files) {
+                if (f.status === 'done') continue;
+                await convertFile(f);
             }
+
+            document.getElementById('statusBadge').textContent = 'Ready';
+            document.getElementById('statusBadge').className = 'status-badge ready';
+            updateUI();
+            toast('success', 'All conversions complete!');
         }
 
-        // Conversion
-        async function convertFiles() {
-            if (!ffmpegLoaded || files.length === 0 || !selectedFormat) return;
+        async function convertFile(fileObj) {
+            fileObj.status = 'converting';
+            fileObj.progress = 0;
+            renderFiles();
 
-            isConverting = true;
-            const btn = document.getElementById('convertBtn');
-            btn.innerHTML = '<span class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></span><span>Converting...</span>';
-            btn.classList.add('loading');
-            btn.disabled = true;
+            const inputExt = fileObj.name.split('.').pop();
+            const inputName = `input.${inputExt}`;
+            const outputName = `output.${selectedFormat}`;
 
-            const ffFetchFile = window.ffmpegFetchFile;
+            try {
+                ffmpeg.FS('writeFile', inputName, await window.ffmpegFetchFile(fileObj.file));
+                const args = buildFFmpegArgs(inputName, outputName, fileObj);
+                await ffmpeg.run(...args);
 
-            for (const fileObj of files) {
-                if (fileObj.status === 'completed') continue;
+                const data = ffmpeg.FS('readFile', outputName);
+                const blob = new Blob([data.buffer], { type: getMimeType(selectedFormat) });
 
-                fileObj.status = 'converting';
-                fileObj.progress = 0;
-                renderFileList();
+                fileObj.converted = URL.createObjectURL(blob);
+                fileObj.convertedSize = blob.size;
+                fileObj.convertedName = fileObj.name.replace(/\.[^/.]+$/, '') + '.' + selectedFormat;
+                fileObj.status = 'done';
 
-                try {
-                    const inputName = 'input' + getExtension(fileObj.name);
-                    const outputName = 'output.' + selectedFormat;
+                ffmpeg.FS('unlink', inputName);
+                ffmpeg.FS('unlink', outputName);
 
-                    // Write input file to FFmpeg's virtual filesystem
-                    ffmpeg.FS('writeFile', inputName, await ffFetchFile(fileObj.file));
+                if (document.getElementById('autoDownload')?.checked) downloadFile(fileObj.id);
+            } catch (err) {
+                console.error('Conversion error:', err);
+                fileObj.status = 'error';
+                toast('error', `Failed: ${fileObj.name}`);
+            }
+            renderFiles();
+        }
 
-                    const ffmpegArgs = buildFFmpegArgs(inputName, outputName, fileObj.type);
-                    await ffmpeg.run(...ffmpegArgs);
+        function buildFFmpegArgs(input, output, fileObj) {
+            const args = [];
+            const trimStart = document.getElementById('trimStart').value;
+            const trimEnd = document.getElementById('trimEnd').value;
 
-                    // Read the output file
-                    const data = ffmpeg.FS('readFile', outputName);
-                    const blob = new Blob([data.buffer], { type: getMimeType(selectedFormat) });
+            // Input options (before -i)
+            if (trimStart) args.push('-ss', trimStart);
+            args.push('-i', input);
+            if (trimEnd) args.push('-t', String(trimEnd - (trimStart || 0)));
 
-                    fileObj.converted = URL.createObjectURL(blob);
-                    fileObj.convertedSize = blob.size;
-                    fileObj.convertedName = fileObj.name.replace(/\.[^/.]+$/, '') + '.' + selectedFormat;
-                    fileObj.status = 'completed';
-                    fileObj.progress = 100;
+            const isVideo = ['mp4', 'webm', 'mkv', 'avi', 'mov', 'gif', 'ts', 'flv', 'wmv'].includes(selectedFormat);
+            const isAudio = ['mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a', 'wma', 'opus'].includes(selectedFormat);
+            const isImage = ['jpg', 'png', 'webp', 'bmp', 'tiff', 'ico'].includes(selectedFormat);
 
-                    // Clean up files
-                    ffmpeg.FS('unlink', inputName);
-                    ffmpeg.FS('unlink', outputName);
-
-                    showToast('success', 'Converted!', fileObj.name);
-                } catch (error) {
-                    console.error('Conversion error:', error);
-                    fileObj.status = 'error';
-                    showToast('error', 'Failed', fileObj.name + ' - ' + error.message);
+            // Video processing
+            if (isVideo && selectedFormat !== 'gif') {
+                const codec = document.getElementById('videoCodec').value;
+                if (codec !== 'copy') {
+                    args.push('-c:v', codec);
+                    const quality = document.getElementById('qualityPreset').value;
+                    if (codec === 'libx264' || codec === 'libx265') args.push('-crf', String(qualityCRF[quality]));
+                    
+                    const bitrate = document.getElementById('videoBitrate').value;
+                    if (bitrate > 0) args.push('-b:v', videoBitrates[bitrate]);
+                } else {
+                    args.push('-c:v', 'copy');
                 }
 
-                renderFileList();
-            }
+                // Video filters
+                const vf = [];
+                const res = document.getElementById('resolution').value;
+                if (res && res !== 'custom') {
+                    const [w, h] = res.split(':');
+                    vf.push(document.getElementById('keepAspect').checked ? 
+                        `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2` :
+                        `scale=${w}:${h}`);
+                } else if (res === 'custom') {
+                    const w = document.getElementById('customWidth').value || -1;
+                    const h = document.getElementById('customHeight').value || -1;
+                    if (w > 0 || h > 0) vf.push(`scale=${w}:${h}`);
+                }
 
-            isConverting = false;
-            btn.innerHTML = '<span>⚡</span><span>Convert Files</span>';
-            btn.classList.remove('loading');
-            updateConvertButton();
-        }
+                const fps = document.getElementById('frameRate').value;
+                if (fps) vf.push(`fps=${fps}`);
 
-        function buildFFmpegArgs(input, output, fileType) {
-            const args = ['-i', input];
+                const rotation = document.getElementById('rotation').value;
+                if (rotation === 'hflip' || rotation === 'vflip') vf.push(rotation);
+                else if (rotation) vf.push(`rotate=${rotation}*PI/180`);
 
-            if (selectedType === 'video' && selectedFormat !== 'gif') {
-                const quality = document.getElementById('videoQuality').value;
-                const resolution = document.getElementById('videoResolution').value;
-                const crf = videoCRF[quality - 1];
+                const speed = document.getElementById('speed').value;
+                if (speed) vf.push(`setpts=${1/parseFloat(speed)}*PTS`);
 
-                args.push('-c:v', 'libx264', '-crf', crf.toString(), '-preset', 'medium');
-                args.push('-c:a', 'aac', '-b:a', '192k');
+                if (vf.length > 0) args.push('-vf', vf.join(','));
 
-                if (resolution !== 'original') {
-                    const [w, h] = resolution.split('x');
-                    args.push('-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2`);
+                // Audio for video
+                const audioCodec = document.getElementById('audioCodec').value;
+                if (audioCodec === 'none') {
+                    args.push('-an');
+                } else if (audioCodec !== 'copy') {
+                    args.push('-c:a', audioCodec);
+                    const ab = audioBitrates[document.getElementById('audioBitrate').value - 1];
+                    args.push('-b:a', ab + 'k');
+                    if (speed) args.push('-af', `atempo=${speed}`);
+                } else {
+                    args.push('-c:a', 'copy');
                 }
             } else if (selectedFormat === 'gif') {
-                args.push('-vf', 'fps=15,scale=480:-1:flags=lanczos');
-                args.push('-loop', '0');
-            } else if (selectedType === 'audio') {
-                const bitrateIndex = document.getElementById('audioBitrate').value - 1;
-                const bitrate = audioBitrateValues[bitrateIndex];
-                const sampleRate = document.getElementById('audioSampleRate').value;
-
-                if (selectedFormat === 'mp3') {
-                    args.push('-c:a', 'libmp3lame', '-b:a', bitrate + 'k');
-                } else if (selectedFormat === 'aac' || selectedFormat === 'm4a') {
-                    args.push('-c:a', 'aac', '-b:a', bitrate + 'k');
-                } else if (selectedFormat === 'flac') {
-                    args.push('-c:a', 'flac');
-                } else {
-                    args.push('-b:a', bitrate + 'k');
+                const res = document.getElementById('resolution').value;
+                const scale = res ? res.split(':')[0] : '480';
+                args.push('-vf', `fps=15,scale=${scale}:-1:flags=lanczos`, '-loop', '0');
+            } else if (isAudio) {
+                const codec = { mp3: 'libmp3lame', aac: 'aac', ogg: 'libvorbis', flac: 'flac', wav: null, m4a: 'aac', opus: 'libopus' }[selectedFormat];
+                if (codec) args.push('-c:a', codec);
+                const ab = audioBitrates[document.getElementById('audioBitrate').value - 1];
+                if (selectedFormat !== 'flac' && selectedFormat !== 'wav') args.push('-b:a', ab + 'k');
+                const sr = document.getElementById('sampleRate').value;
+                if (sr) args.push('-ar', sr);
+                const ch = document.getElementById('audioChannels').value;
+                if (ch) args.push('-ac', ch);
+                if (document.getElementById('normalizeAudio').checked) args.push('-af', 'loudnorm');
+            } else if (isImage) {
+                const res = document.getElementById('resolution').value;
+                if (res && res !== 'custom') {
+                    const [w, h] = res.split(':');
+                    args.push('-vf', `scale=${w}:${h}`);
                 }
-
-                if (sampleRate !== 'original') {
-                    args.push('-ar', sampleRate);
-                }
-            } else if (selectedType === 'image') {
-                const quality = document.getElementById('imageQuality').value;
-                if (selectedFormat === 'jpg' || selectedFormat === 'jpeg') {
-                    args.push('-q:v', Math.round((100 - quality) / 3).toString());
-                } else if (selectedFormat === 'webp') {
-                    args.push('-quality', quality.toString());
-                }
+                if (selectedFormat === 'jpg') args.push('-q:v', '2');
             }
 
+            if (document.getElementById('stripMetadata').checked) args.push('-map_metadata', '-1');
+
+            const customArgs = document.getElementById('customArgs').value.trim();
+            if (customArgs) args.push(...customArgs.split(' '));
+
             args.push('-y', output);
+            console.log('FFmpeg args:', args.join(' '));
             return args;
         }
 
-        function getExtension(filename) {
-            const match = filename.match(/\.[^/.]+$/);
-            return match ? match[0] : '';
+        function updateConversionProgress(progress) {
+            const f = files.find(f => f.status === 'converting');
+            if (f) { f.progress = progress; renderFiles(); }
         }
 
-        function getMimeType(format) {
-            const mimeTypes = {
-                mp4: 'video/mp4', webm: 'video/webm', avi: 'video/x-msvideo',
-                mov: 'video/quicktime', mkv: 'video/x-matroska', gif: 'image/gif',
-                mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
-                aac: 'audio/aac', flac: 'audio/flac', m4a: 'audio/mp4',
-                png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-                webp: 'image/webp', bmp: 'image/bmp', ico: 'image/x-icon',
-                tiff: 'image/tiff'
-            };
-            return mimeTypes[format] || 'application/octet-stream';
+        function getMimeType(fmt) {
+            const types = { mp4: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska', avi: 'video/x-msvideo', mov: 'video/quicktime', gif: 'image/gif', mp3: 'audio/mpeg', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', flac: 'audio/flac', m4a: 'audio/mp4', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', bmp: 'image/bmp', tiff: 'image/tiff', ico: 'image/x-icon' };
+            return types[fmt] || 'application/octet-stream';
         }
 
-        // Download and Preview
+        // ===== Download & Preview =====
         function downloadFile(id) {
-            const fileObj = files.find(f => f.id == id);
-            if (fileObj && fileObj.converted) {
+            const f = files.find(f => f.id == id);
+            if (f?.converted) {
                 const a = document.createElement('a');
-                a.href = fileObj.converted;
-                a.download = fileObj.convertedName;
+                a.href = f.converted;
+                a.download = f.convertedName;
                 a.click();
             }
         }
 
         function previewFile(id) {
-            const fileObj = files.find(f => f.id == id);
-            if (!fileObj || !fileObj.converted) return;
-
-            const modal = document.getElementById('previewModal');
-            const title = document.getElementById('previewTitle');
+            const f = files.find(f => f.id == id);
+            if (!f?.converted) return;
+            previewFileId = id;
+            
+            document.getElementById('previewTitle').textContent = f.convertedName;
             const content = document.getElementById('previewContent');
-
-            title.textContent = fileObj.convertedName;
-
             const type = getMimeType(selectedFormat).split('/')[0];
-            if (type === 'video') {
-                content.innerHTML = `<video controls src="${fileObj.converted}"></video>`;
-            } else if (type === 'audio') {
-                content.innerHTML = `<audio controls src="${fileObj.converted}"></audio>`;
-            } else if (type === 'image') {
-                content.innerHTML = `<img src="${fileObj.converted}" alt="${fileObj.convertedName}">`;
-            }
-
-            modal.classList.add('active');
+            
+            if (type === 'video') content.innerHTML = `<video controls autoplay src="${f.converted}"></video>`;
+            else if (type === 'audio') content.innerHTML = `<audio controls autoplay src="${f.converted}"></audio>`;
+            else content.innerHTML = `<img src="${f.converted}" alt="${f.convertedName}">`;
+            
+            document.getElementById('previewModal').classList.add('active');
         }
 
-        function closePreview() {
-            document.getElementById('previewModal').classList.remove('active');
+        function downloadPreview() { if (previewFileId) downloadFile(previewFileId); }
+
+        // ===== Modals =====
+        function showSettings() { document.getElementById('settingsModal').classList.add('active'); }
+        function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+
+        // ===== URL Import =====
+        function addFromUrl() {
+            const url = prompt('Enter file URL:');
+            if (url) toast('info', 'URL import coming soon!');
         }
 
-        // Theme
-        function toggleTheme() {
-            document.body.classList.toggle('light-mode');
-            const isLight = document.body.classList.contains('light-mode');
-            document.querySelector('.theme-toggle').textContent = isLight ? '☀️' : '🌙';
-            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        // ===== Toast =====
+        function toast(type, message) {
+            if (!document.getElementById('showNotifications')?.checked) return;
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<span class="toast-icon">${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span><span class="toast-text">${message}</span>`;
+            document.getElementById('toastContainer').appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 4000);
         }
-
-        function loadTheme() {
-            if (localStorage.getItem('theme') === 'light') {
-                document.body.classList.add('light-mode');
-                document.querySelector('.theme-toggle').textContent = '☀️';
-            }
-        }
-
-        // Toast notifications
-        function showToast(type, title, message) {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `
-                <span class="toast-icon">${type === 'success' ? '✓' : '✕'}</span>
-                <div class="toast-content">
-                    <div class="toast-title">${title}</div>
-                    <div class="toast-message">${message}</div>
-                </div>
-            `;
-            container.appendChild(toast);
-
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(100%)';
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
-        }
-
-        // Close modal on click outside
-        document.getElementById('previewModal').addEventListener('click', (e) => {
-            if (e.target.id === 'previewModal') closePreview();
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closePreview();
-        });
     </script>
 </body>
 </html>
