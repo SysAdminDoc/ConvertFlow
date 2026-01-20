@@ -1141,14 +1141,14 @@
                     console.log('FFmpeg:', message);
                 });
 
-                // Load all resources as blob URLs to avoid CORS issues
-                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+                // Use single-threaded core and load class worker as blob to avoid CORS issues
+                const coreBaseURL = 'https://unpkg.com/@ffmpeg/core-st@0.12.6/dist/umd';
                 const ffmpegBaseURL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd';
                 
                 await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                    workerURL: await toBlobURL(`${ffmpegBaseURL}/814.ffmpeg.js`, 'text/javascript'),
+                    coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    classWorkerURL: await toBlobURL(`${ffmpegBaseURL}/814.ffmpeg.js`, 'text/javascript'),
                 });
 
                 ffmpegLoaded = true;
