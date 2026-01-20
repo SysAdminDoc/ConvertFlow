@@ -4,7 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ConvertFlow - Modern File Converter</title>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.1/dist/ffmpeg.min.js"></script></script>
+    <!-- Register service worker for SharedArrayBuffer support -->
+    <script>
+        if (!window.crossOriginIsolated && navigator.serviceWorker) {
+            navigator.serviceWorker.register('coi-serviceworker.js')
+                .then(reg => {
+                    console.log('Service worker registered for COOP/COEP');
+                    if (reg.active && !navigator.serviceWorker.controller) {
+                        window.location.reload();
+                    }
+                    reg.addEventListener('updatefound', () => {
+                        const worker = reg.installing;
+                        worker.addEventListener('statechange', () => {
+                            if (worker.state === 'activated' && !navigator.serviceWorker.controller) {
+                                window.location.reload();
+                            }
+                        });
+                    });
+                })
+                .catch(err => console.warn('Service worker registration failed:', err));
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -924,7 +945,7 @@
                     <div class="ffmpeg-loading">
                         <div class="spinner"></div>
                         <div class="loading-text">Loading FFmpeg...</div>
-                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">First load may take a moment</p>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">First load may reload the page once</p>
                     </div>
                 </div>
 
@@ -1124,15 +1145,14 @@
             loadTheme();
         });
 
-        // FFmpeg initialization (using 0.11.x API with single-threaded core)
+        // FFmpeg initialization (using 0.10.x API with coi-serviceworker for SharedArrayBuffer)
         async function initFFmpeg() {
             try {
                 const { createFFmpeg, fetchFile: ffFetchFile } = FFmpeg;
                 
                 ffmpeg = createFFmpeg({
                     log: true,
-                    // Use single-threaded core - doesn't require SharedArrayBuffer
-                    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
+                    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js',
                     progress: ({ ratio }) => {
                         updateProgress(Math.round(ratio * 100));
                     }
