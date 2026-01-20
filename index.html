@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ConvertFlow - Universal File Converter</title>
+    <title>MediaForge - Complete Media Toolkit</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Service worker for SharedArrayBuffer -->
     <script>
         window.coiReady = (async function() {
             if (window.crossOriginIsolated) return true;
@@ -19,7 +18,7 @@
                 const notice = document.createElement('div');
                 notice.id = 'setup-notice';
                 notice.style.cssText = 'position:fixed;inset:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px;';
-                notice.innerHTML = '<div style="width:40px;height:40px;border:3px solid #222;border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;"></div><div style="color:white;font-family:system-ui;font-size:16px;">Initializing ConvertFlow...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+                notice.innerHTML = '<div style="width:40px;height:40px;border:3px solid #222;border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;"></div><div style="color:white;font-family:system-ui;font-size:16px;">Initializing MediaForge...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
                 document.documentElement.appendChild(notice);
                 await navigator.serviceWorker.register('coi-serviceworker.js');
                 await navigator.serviceWorker.ready;
@@ -39,511 +38,831 @@
             --warning: #f59e0b; --warning-dim: rgba(245,158,11,0.12);
             --error: #ef4444; --error-dim: rgba(239,68,68,0.12);
             --border: #27272a; --radius: 8px;
+            --purple: #a855f7; --pink: #ec4899; --blue: #3b82f6; --green: #22c55e; --orange: #f97316;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); color: var(--text-0); height: 100vh; overflow: hidden; }
         
-        /* Layout */
-        .app { display: grid; grid-template-columns: 280px 1fr 320px; grid-template-rows: 56px 1fr; height: 100vh; }
-        .header { grid-column: 1 / -1; background: var(--bg-1); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
-        .sidebar-left { background: var(--bg-1); border-right: 1px solid var(--border); overflow-y: auto; }
-        .main { background: var(--bg-0); display: flex; flex-direction: column; overflow: hidden; }
-        .sidebar-right { background: var(--bg-1); border-left: 1px solid var(--border); overflow-y: auto; }
+        /* App Layout */
+        .app { display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Top Navigation */
+        .top-nav { display: flex; align-items: center; justify-content: space-between; padding: 0 16px; height: 52px; background: var(--bg-1); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+        .logo-icon { width: 30px; height: 30px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        
+        /* Mode Tabs */
+        .mode-tabs { display: flex; background: var(--bg-2); border-radius: 8px; padding: 3px; }
+        .mode-tab { padding: 8px 20px; background: transparent; border: none; border-radius: 6px; color: var(--text-2); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+        .mode-tab:hover { color: var(--text-1); }
+        .mode-tab.active { background: var(--accent); color: white; }
+        .mode-tab .mode-icon { font-size: 15px; }
+        
+        .nav-actions { display: flex; gap: 8px; align-items: center; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
+        .status-dot.ready { background: var(--success); }
+        .status-dot.error { background: var(--error); }
+        .nav-btn { padding: 8px 14px; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-1); font-size: 12px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+        .nav-btn:hover { background: var(--bg-4); color: var(--text-0); }
+        .nav-btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+        .nav-btn.primary:hover { background: var(--accent-hover); }
+        .nav-btn.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        /* Header */
-        .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
-        .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), #a855f7); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-        .header-center { display: flex; gap: 8px; }
-        .header-btn { padding: 8px 16px; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-1); font-size: 13px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
-        .header-btn:hover { background: var(--bg-4); color: var(--text-0); }
-        .header-btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
-        .header-btn.primary:hover { background: var(--accent-hover); }
-        .header-btn.primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .header-actions { display: flex; gap: 8px; align-items: center; }
-        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .status-badge.ready { background: var(--success-dim); color: var(--success); }
-        .status-badge.loading { background: var(--warning-dim); color: var(--warning); }
-        .status-badge.error { background: var(--error-dim); color: var(--error); }
+        /* Main Content Area */
+        .main-content { flex: 1; display: flex; overflow: hidden; }
+        
+        /* Mode Panels */
+        .mode-panel { display: none; flex: 1; overflow: hidden; }
+        .mode-panel.active { display: flex; }
 
-        /* Sidebar Left - Tools */
-        .section { padding: 16px; border-bottom: 1px solid var(--border); }
-        .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
-        .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-        .tool-btn { padding: 10px 8px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-1); font-size: 12px; cursor: pointer; transition: all 0.15s; text-align: center; }
-        .tool-btn:hover { background: var(--bg-3); color: var(--text-0); border-color: var(--accent); }
+        /* ==================== CONVERTER MODE ==================== */
+        .converter-panel { display: flex; }
+        .converter-sidebar { width: 260px; background: var(--bg-1); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
+        .converter-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .converter-settings { width: 300px; background: var(--bg-1); border-left: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
+
+        /* Sections */
+        .section { padding: 14px; border-bottom: 1px solid var(--border); }
+        .section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); margin-bottom: 10px; }
+        
+        /* Tool Grid */
+        .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+        .tool-btn { padding: 10px 6px; background: var(--bg-2); border: 1px solid transparent; border-radius: var(--radius); color: var(--text-2); font-size: 10px; cursor: pointer; transition: all 0.15s; text-align: center; }
+        .tool-btn:hover { background: var(--bg-3); color: var(--text-1); border-color: var(--border); }
         .tool-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-        .tool-btn .icon { font-size: 18px; display: block; margin-bottom: 4px; }
+        .tool-btn .icon { font-size: 18px; display: block; margin-bottom: 3px; }
 
-        /* Format selector */
-        .format-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
-        .format-tab { flex: 1; padding: 6px; background: var(--bg-2); border: none; border-radius: var(--radius); color: var(--text-2); font-size: 11px; cursor: pointer; transition: all 0.15s; }
-        .format-tab:hover { color: var(--text-1); }
+        /* Format Grid */
+        .format-tabs { display: flex; gap: 2px; margin-bottom: 8px; }
+        .format-tab { flex: 1; padding: 6px; background: var(--bg-2); border: none; border-radius: var(--radius); color: var(--text-3); font-size: 10px; cursor: pointer; transition: all 0.15s; }
+        .format-tab:hover { color: var(--text-2); }
         .format-tab.active { background: var(--accent); color: white; }
-        .format-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-        .format-btn { padding: 8px 4px; background: var(--bg-2); border: 1px solid transparent; border-radius: var(--radius); color: var(--text-1); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-transform: uppercase; }
-        .format-btn:hover { background: var(--bg-3); border-color: var(--border); }
-        .format-btn.selected { background: var(--accent); color: white; }
+        .format-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+        .format-btn { padding: 6px 3px; background: var(--bg-2); border: 1px solid transparent; border-radius: 4px; color: var(--text-2); font-size: 10px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-transform: uppercase; }
+        .format-btn:hover { background: var(--bg-3); }
+        .format-btn.selected { background: var(--accent); color: white; border-color: var(--accent); }
 
-        /* Main Area */
-        .drop-zone { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed var(--border); margin: 16px; border-radius: 12px; transition: all 0.2s; cursor: pointer; position: relative; }
+        /* Presets */
+        .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+        .preset-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; background: var(--bg-2); border: 1px solid transparent; border-radius: var(--radius); cursor: pointer; transition: all 0.15s; }
+        .preset-btn:hover { border-color: var(--border); background: var(--bg-3); }
+        .preset-btn.active { border-color: var(--accent); background: var(--accent-dim); }
+        .preset-icon { font-size: 20px; }
+        .preset-name { font-size: 10px; color: var(--text-1); font-weight: 500; }
+
+        /* Drop Zone */
+        .drop-zone { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed var(--border); margin: 12px; border-radius: 12px; transition: all 0.2s; cursor: pointer; position: relative; min-height: 200px; }
         .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-dim); }
-        .drop-zone.has-files { border-style: solid; cursor: default; }
-        .drop-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.8; }
-        .drop-text { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
-        .drop-hint { font-size: 13px; color: var(--text-2); }
+        .drop-zone.has-files { border-style: solid; cursor: default; align-items: stretch; justify-content: flex-start; }
         .drop-zone input { display: none; }
+        .drop-content { text-align: center; }
+        .drop-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.7; }
+        .drop-text { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+        .drop-hint { font-size: 12px; color: var(--text-2); }
 
         /* File List */
-        .file-list { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
-        .file-list-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; margin: 16px 16px 0; background: var(--bg-2); border-radius: var(--radius) var(--radius) 0 0; }
-        .file-list-header h3 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-        .file-count { background: var(--accent-dim); color: var(--accent); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
-        .file-list-actions { display: flex; gap: 8px; }
-        .file-list-actions button { background: none; border: none; color: var(--text-2); font-size: 12px; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+        .file-list-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-2); border-radius: 8px 8px 0 0; margin: 12px 12px 0; }
+        .file-list-header h3 { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .file-count { background: var(--accent); color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; }
+        .file-list-actions { display: flex; gap: 6px; }
+        .file-list-actions button { background: none; border: none; color: var(--text-2); font-size: 11px; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
         .file-list-actions button:hover { background: var(--bg-3); color: var(--text-1); }
         
-        .file-grid { background: var(--bg-1); border-radius: 0 0 var(--radius) var(--radius); border: 1px solid var(--border); border-top: none; max-height: calc(100vh - 220px); overflow-y: auto; }
-        .file-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+        .file-grid { flex: 1; background: var(--bg-1); border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; margin: 0 12px 12px; overflow-y: auto; }
+        .file-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); transition: background 0.15s; }
         .file-item:last-child { border-bottom: none; }
         .file-item:hover { background: var(--bg-2); }
         .file-item.converting { background: var(--accent-dim); }
         .file-item.done { background: var(--success-dim); }
         .file-item.error { background: var(--error-dim); }
         
-        .file-thumb { width: 40px; height: 40px; background: var(--bg-3); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; overflow: hidden; }
+        .file-thumb { width: 36px; height: 36px; background: var(--bg-3); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; overflow: hidden; }
         .file-thumb img, .file-thumb video { width: 100%; height: 100%; object-fit: cover; }
         .file-info { flex: 1; min-width: 0; }
-        .file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .file-meta { font-size: 11px; color: var(--text-2); display: flex; gap: 8px; margin-top: 2px; }
-        .file-progress { height: 3px; background: var(--bg-4); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+        .file-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-meta { font-size: 10px; color: var(--text-2); display: flex; gap: 8px; margin-top: 2px; }
+        .file-progress { height: 2px; background: var(--bg-4); border-radius: 2px; margin-top: 4px; overflow: hidden; }
         .file-progress-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
         .file-actions { display: flex; gap: 4px; }
-        .file-action { width: 28px; height: 28px; border-radius: 6px; border: none; background: var(--bg-3); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s; }
+        .file-action { width: 26px; height: 26px; border-radius: 6px; border: none; background: var(--bg-3); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.15s; }
         .file-action:hover { background: var(--bg-4); color: var(--text-0); }
-        .file-action.download { background: var(--success-dim); color: var(--success); }
+        .file-action.download { color: var(--success); }
         .file-action.download:hover { background: var(--success); color: white; }
 
-        /* Sidebar Right - Settings */
-        .setting-group { margin-bottom: 16px; }
-        .setting-group:last-child { margin-bottom: 0; }
-        .setting-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; color: var(--text-1); }
-        .setting-value { color: var(--accent); font-weight: 600; }
+        /* Settings Panel */
+        .settings-tabs { display: flex; padding: 10px 14px; gap: 4px; border-bottom: 1px solid var(--border); }
+        .settings-tab { flex: 1; padding: 6px; background: transparent; border: none; border-radius: var(--radius); color: var(--text-3); font-size: 11px; cursor: pointer; transition: all 0.15s; }
+        .settings-tab:hover { color: var(--text-2); background: var(--bg-2); }
+        .settings-tab.active { color: var(--text-0); background: var(--bg-3); }
+        .settings-content { display: none; }
+        .settings-content.active { display: block; }
+        
+        .setting-group { margin-bottom: 14px; }
+        .setting-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 11px; color: var(--text-2); }
+        .setting-value { color: var(--accent); font-weight: 600; font-size: 10px; }
         .setting-slider { width: 100%; height: 4px; -webkit-appearance: none; background: var(--bg-3); border-radius: 2px; outline: none; }
-        .setting-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--accent); border-radius: 50%; cursor: pointer; }
-        .setting-select { width: 100%; padding: 8px 10px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-0); font-size: 12px; cursor: pointer; }
-        .setting-input { width: 100%; padding: 8px 10px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-0); font-size: 12px; }
+        .setting-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--accent); border-radius: 50%; cursor: pointer; }
+        .setting-select { width: 100%; padding: 7px 10px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-0); font-size: 11px; cursor: pointer; }
+        .setting-input { width: 100%; padding: 7px 10px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-0); font-size: 11px; }
         .setting-input:focus, .setting-select:focus { outline: none; border-color: var(--accent); }
         .setting-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .setting-checkbox { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-1); cursor: pointer; }
+        .setting-checkbox { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-1); cursor: pointer; }
         .setting-checkbox input { accent-color: var(--accent); }
 
-        /* Quick Actions / Presets */
-        .preset-list { display: flex; flex-direction: column; gap: 6px; }
-        .preset-btn { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.15s; text-align: left; }
-        .preset-btn:hover { border-color: var(--accent); background: var(--bg-3); }
-        .preset-btn.active { border-color: var(--accent); background: var(--accent-dim); }
-        .preset-icon { font-size: 20px; }
-        .preset-info { flex: 1; }
-        .preset-name { font-size: 12px; font-weight: 500; color: var(--text-0); }
-        .preset-desc { font-size: 10px; color: var(--text-2); margin-top: 1px; }
+        /* ==================== PHOTO EDITOR MODE ==================== */
+        .photo-panel { display: flex; }
+        .photo-toolbar { width: 56px; background: var(--bg-1); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 4px; }
+        .photo-tool { width: 42px; height: 42px; background: transparent; border: none; border-radius: var(--radius); color: var(--text-2); font-size: 18px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+        .photo-tool:hover { background: var(--bg-2); color: var(--text-1); }
+        .photo-tool.active { background: var(--accent); color: white; }
+        .photo-tool-divider { width: 32px; height: 1px; background: var(--border); margin: 6px 0; }
+        
+        .photo-canvas-area { flex: 1; display: flex; flex-direction: column; background: var(--bg-0); position: relative; overflow: hidden; }
+        .photo-canvas-container { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .photo-canvas-wrapper { position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        #photoCanvas { display: block; max-width: 100%; max-height: 100%; }
+        .photo-empty { text-align: center; color: var(--text-2); }
+        .photo-empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+        .photo-empty-text { font-size: 14px; margin-bottom: 8px; }
+        .photo-empty-hint { font-size: 12px; color: var(--text-3); }
+        
+        .photo-bottom-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: var(--bg-1); border-top: 1px solid var(--border); }
+        .photo-zoom { display: flex; align-items: center; gap: 8px; }
+        .photo-zoom-btn { width: 28px; height: 28px; background: var(--bg-3); border: none; border-radius: 4px; color: var(--text-1); cursor: pointer; }
+        .photo-zoom-btn:hover { background: var(--bg-4); }
+        .photo-zoom-value { font-size: 11px; color: var(--text-2); min-width: 40px; text-align: center; }
+        .photo-info { font-size: 11px; color: var(--text-2); }
+        
+        .photo-sidebar { width: 280px; background: var(--bg-1); border-left: 1px solid var(--border); overflow-y: auto; }
+        .photo-section { padding: 14px; border-bottom: 1px solid var(--border); }
+        .photo-section-title { font-size: 11px; font-weight: 600; color: var(--text-1); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        
+        .adjustment-slider { margin-bottom: 12px; }
+        .adjustment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .adjustment-name { font-size: 11px; color: var(--text-2); }
+        .adjustment-value { font-size: 10px; color: var(--accent); font-weight: 600; }
+        .adjustment-track { position: relative; height: 4px; background: var(--bg-3); border-radius: 2px; }
+        .adjustment-track input { position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .adjustment-fill { height: 100%; background: var(--accent); border-radius: 2px; pointer-events: none; }
+        
+        .filter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .filter-btn { aspect-ratio: 1; background: var(--bg-2); border: 2px solid transparent; border-radius: var(--radius); cursor: pointer; overflow: hidden; position: relative; transition: all 0.15s; }
+        .filter-btn:hover { border-color: var(--border); }
+        .filter-btn.active { border-color: var(--accent); }
+        .filter-btn img { width: 100%; height: 100%; object-fit: cover; }
+        .filter-name { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); padding: 3px; font-size: 9px; text-align: center; color: white; }
 
-        /* Tabs */
-        .tabs { display: flex; gap: 4px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
-        .tab { flex: 1; padding: 8px; background: transparent; border: none; border-radius: var(--radius); color: var(--text-2); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-        .tab:hover { color: var(--text-1); background: var(--bg-2); }
-        .tab.active { color: var(--text-0); background: var(--bg-3); }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        /* ==================== VIDEO EDITOR MODE ==================== */
+        .video-panel { display: flex; flex-direction: column; }
+        .video-main { flex: 1; display: flex; overflow: hidden; }
+        .video-preview-area { flex: 1; display: flex; flex-direction: column; background: var(--bg-0); }
+        .video-preview { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; position: relative; }
+        .video-preview video { max-width: 100%; max-height: 100%; }
+        .video-preview-empty { text-align: center; color: var(--text-2); }
+        .video-preview-empty-icon { font-size: 56px; margin-bottom: 12px; opacity: 0.4; }
+        
+        .video-controls { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg-1); border-top: 1px solid var(--border); }
+        .video-play-btn { width: 40px; height: 40px; background: var(--accent); border: none; border-radius: 50%; color: white; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .video-play-btn:hover { background: var(--accent-hover); }
+        .video-time { font-size: 12px; color: var(--text-1); font-variant-numeric: tabular-nums; }
+        .video-scrubber { flex: 1; height: 4px; background: var(--bg-3); border-radius: 2px; cursor: pointer; position: relative; }
+        .video-scrubber-fill { height: 100%; background: var(--accent); border-radius: 2px; pointer-events: none; }
+        .video-scrubber-handle { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .video-volume { display: flex; align-items: center; gap: 8px; }
+        .video-volume-btn { background: none; border: none; color: var(--text-1); font-size: 16px; cursor: pointer; }
+        .video-volume-slider { width: 80px; height: 4px; -webkit-appearance: none; background: var(--bg-3); border-radius: 2px; }
+        .video-volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; background: white; border-radius: 50%; cursor: pointer; }
+        
+        .video-sidebar { width: 300px; background: var(--bg-1); border-left: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; }
+        .video-sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); }
+        .video-sidebar-tab { flex: 1; padding: 12px; background: transparent; border: none; color: var(--text-2); font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+        .video-sidebar-tab:hover { color: var(--text-1); }
+        .video-sidebar-tab.active { color: var(--text-0); border-bottom-color: var(--accent); }
+        .video-sidebar-content { flex: 1; overflow-y: auto; }
+        .video-sidebar-panel { display: none; }
+        .video-sidebar-panel.active { display: block; }
+        
+        /* Timeline */
+        .video-timeline { height: 140px; background: var(--bg-1); border-top: 1px solid var(--border); display: flex; flex-direction: column; }
+        .timeline-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+        .timeline-btn { padding: 6px 10px; background: var(--bg-3); border: none; border-radius: 4px; color: var(--text-1); font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .timeline-btn:hover { background: var(--bg-4); }
+        .timeline-zoom { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+        .timeline-zoom-btn { width: 24px; height: 24px; background: var(--bg-3); border: none; border-radius: 4px; color: var(--text-2); cursor: pointer; font-size: 12px; }
+        
+        .timeline-tracks { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; }
+        .timeline-track { height: 50px; background: var(--bg-2); margin: 4px 8px; border-radius: 4px; position: relative; display: flex; align-items: center; }
+        .timeline-clip { height: 42px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 4px; margin: 4px; display: flex; align-items: center; padding: 0 8px; cursor: move; position: relative; min-width: 60px; }
+        .timeline-clip-thumb { width: 32px; height: 32px; background: rgba(0,0,0,0.3); border-radius: 4px; margin-right: 8px; overflow: hidden; }
+        .timeline-clip-thumb img, .timeline-clip-thumb video { width: 100%; height: 100%; object-fit: cover; }
+        .timeline-clip-name { font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .timeline-clip-duration { font-size: 9px; opacity: 0.7; }
+        .timeline-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--error); z-index: 10; pointer-events: none; }
+        .timeline-playhead::before { content: ''; position: absolute; top: -4px; left: -5px; border: 6px solid transparent; border-top-color: var(--error); }
+
+        /* Quick Actions Bar */
+        .quick-actions { display: flex; gap: 6px; padding: 10px; background: var(--bg-2); border-radius: var(--radius); margin-bottom: 12px; }
+        .quick-action { flex: 1; padding: 8px; background: var(--bg-3); border: none; border-radius: 6px; color: var(--text-1); font-size: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: all 0.15s; }
+        .quick-action:hover { background: var(--bg-4); color: var(--text-0); }
+        .quick-action .icon { font-size: 16px; }
 
         /* Modal */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.2s; }
         .modal-overlay.active { opacity: 1; visibility: visible; }
-        .modal { background: var(--bg-1); border: 1px solid var(--border); border-radius: 12px; width: 90%; max-width: 600px; max-height: 80vh; overflow: hidden; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
-        .modal-title { font-size: 16px; font-weight: 600; }
-        .modal-close { background: none; border: none; color: var(--text-2); font-size: 20px; cursor: pointer; padding: 4px; }
-        .modal-close:hover { color: var(--text-0); }
-        .modal-body { padding: 20px; overflow-y: auto; max-height: calc(80vh - 120px); }
-        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
-
-        /* Preview */
-        .preview-container { display: flex; align-items: center; justify-content: center; background: var(--bg-0); border-radius: var(--radius); min-height: 200px; }
-        .preview-container img, .preview-container video { max-width: 100%; max-height: 400px; border-radius: var(--radius); }
-        .preview-container audio { width: 100%; }
+        .modal { background: var(--bg-1); border: 1px solid var(--border); border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; overflow: hidden; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+        .modal-title { font-size: 15px; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-2); font-size: 18px; cursor: pointer; padding: 4px; }
+        .modal-body { padding: 18px; overflow-y: auto; max-height: calc(80vh - 110px); }
+        .modal-footer { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
 
         /* Toast */
         .toast-container { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 1001; }
-        .toast { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .toast { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         @keyframes slideIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
         .toast.success { border-color: var(--success); }
         .toast.error { border-color: var(--error); }
-        .toast-icon { font-size: 18px; }
-        .toast-text { font-size: 13px; }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-1); }
-        ::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+        .toast-icon { font-size: 16px; }
+        .toast-text { font-size: 12px; }
 
         /* Loading */
-        .loading-overlay { position: absolute; inset: 0; background: var(--bg-1); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 10; }
-        .spinner { width: 40px; height: 40px; border: 3px solid var(--bg-4); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        .loading-overlay { position: absolute; inset: 0; background: var(--bg-1); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 10; }
+        .spinner { width: 32px; height: 32px; border: 3px solid var(--bg-4); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Responsive */
-        @media (max-width: 1100px) {
-            .app { grid-template-columns: 240px 1fr 280px; }
-        }
-        @media (max-width: 900px) {
-            .app { grid-template-columns: 1fr; grid-template-rows: 56px 1fr auto; }
-            .sidebar-left, .sidebar-right { display: none; }
-            .sidebar-right.mobile-open { display: block; position: fixed; bottom: 0; left: 0; right: 0; height: 50vh; z-index: 100; border-top: 1px solid var(--border); border-left: none; }
-        }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-1); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+        /* Crop overlay */
+        .crop-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: none; }
+        .crop-overlay.active { display: block; }
+        .crop-box { position: absolute; border: 2px solid white; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); cursor: move; }
+        .crop-handle { position: absolute; width: 10px; height: 10px; background: white; border-radius: 2px; }
+        .crop-handle.tl { top: -5px; left: -5px; cursor: nwse-resize; }
+        .crop-handle.tr { top: -5px; right: -5px; cursor: nesw-resize; }
+        .crop-handle.bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
+        .crop-handle.br { bottom: -5px; right: -5px; cursor: nwse-resize; }
     </style>
 </head>
 <body>
     <div class="app">
-        <!-- Header -->
-        <header class="header">
+        <!-- Top Navigation -->
+        <nav class="top-nav">
             <div class="logo">
-                <div class="logo-icon">⚡</div>
-                <span>ConvertFlow</span>
+                <div class="logo-icon">🔥</div>
+                <span>MediaForge</span>
             </div>
-            <div class="header-center">
-                <button class="header-btn" onclick="document.getElementById('fileInput').click()">
-                    <span>📁</span> Add Files
+            
+            <div class="mode-tabs">
+                <button class="mode-tab active" onclick="setMode('converter')" data-mode="converter">
+                    <span class="mode-icon">🔄</span> Convert
                 </button>
-                <button class="header-btn" onclick="addFromUrl()">
-                    <span>🔗</span> From URL
+                <button class="mode-tab" onclick="setMode('photo')" data-mode="photo">
+                    <span class="mode-icon">🖼️</span> Photo Edit
                 </button>
-                <button class="header-btn primary" id="convertBtn" onclick="convertAll()" disabled>
-                    <span>⚡</span> Convert All
+                <button class="mode-tab" onclick="setMode('video')" data-mode="video">
+                    <span class="mode-icon">🎬</span> Video Edit
                 </button>
             </div>
-            <div class="header-actions">
-                <span class="status-badge loading" id="statusBadge">Loading...</span>
-                <button class="header-btn" onclick="showSettings()" title="Settings">⚙️</button>
+            
+            <div class="nav-actions">
+                <div class="status-dot" id="statusDot" title="Loading..."></div>
+                <button class="nav-btn" onclick="document.getElementById('globalFileInput').click()">
+                    📁 Open
+                </button>
+                <button class="nav-btn primary" id="exportBtn" onclick="exportCurrent()" disabled>
+                    ⬇️ Export
+                </button>
+                <input type="file" id="globalFileInput" multiple accept="video/*,audio/*,image/*,.mkv,.avi,.mov,.webm,.flv,.wmv,.m4v,.3gp,.flac,.aac,.ogg,.wma,.m4a" style="display:none">
             </div>
-        </header>
+        </nav>
 
-        <!-- Left Sidebar - Tools -->
-        <aside class="sidebar-left">
-            <div class="section">
-                <div class="section-title">Quick Tools</div>
-                <div class="tool-grid">
-                    <button class="tool-btn active" onclick="setTool('convert')" data-tool="convert">
-                        <span class="icon">🔄</span>Convert
-                    </button>
-                    <button class="tool-btn" onclick="setTool('compress')" data-tool="compress">
-                        <span class="icon">📦</span>Compress
-                    </button>
-                    <button class="tool-btn" onclick="setTool('extract')" data-tool="extract">
-                        <span class="icon">🎵</span>Extract
-                    </button>
-                    <button class="tool-btn" onclick="setTool('resize')" data-tool="resize">
-                        <span class="icon">📐</span>Resize
-                    </button>
-                    <button class="tool-btn" onclick="setTool('trim')" data-tool="trim">
-                        <span class="icon">✂️</span>Trim
-                    </button>
-                    <button class="tool-btn" onclick="setTool('gif')" data-tool="gif">
-                        <span class="icon">🎞️</span>GIF
-                    </button>
-                </div>
-            </div>
-
-            <div class="section">
-                <div class="section-title">Output Format</div>
-                <div class="format-tabs">
-                    <button class="format-tab active" onclick="setFormatTab('video')" data-tab="video">Video</button>
-                    <button class="format-tab" onclick="setFormatTab('audio')" data-tab="audio">Audio</button>
-                    <button class="format-tab" onclick="setFormatTab('image')" data-tab="image">Image</button>
-                </div>
-                <div class="format-grid" id="formatGrid">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-
-            <div class="section">
-                <div class="section-title">Presets</div>
-                <div class="preset-list">
-                    <button class="preset-btn" onclick="applyPreset('web')">
-                        <span class="preset-icon">🌐</span>
-                        <div class="preset-info">
-                            <div class="preset-name">Web Optimized</div>
-                            <div class="preset-desc">MP4 H.264, balanced quality</div>
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- ==================== CONVERTER MODE ==================== -->
+            <div class="mode-panel converter-panel active" id="converterPanel">
+                <aside class="converter-sidebar">
+                    <div class="section">
+                        <div class="section-title">Quick Tools</div>
+                        <div class="tool-grid">
+                            <button class="tool-btn active" onclick="setConvertTool('convert')" data-tool="convert"><span class="icon">🔄</span>Convert</button>
+                            <button class="tool-btn" onclick="setConvertTool('compress')" data-tool="compress"><span class="icon">📦</span>Compress</button>
+                            <button class="tool-btn" onclick="setConvertTool('extract')" data-tool="extract"><span class="icon">🎵</span>Audio</button>
+                            <button class="tool-btn" onclick="setConvertTool('resize')" data-tool="resize"><span class="icon">📐</span>Resize</button>
+                            <button class="tool-btn" onclick="setConvertTool('trim')" data-tool="trim"><span class="icon">✂️</span>Trim</button>
+                            <button class="tool-btn" onclick="setConvertTool('gif')" data-tool="gif"><span class="icon">🎞️</span>GIF</button>
                         </div>
-                    </button>
-                    <button class="preset-btn" onclick="applyPreset('mobile')">
-                        <span class="preset-icon">📱</span>
-                        <div class="preset-info">
-                            <div class="preset-name">Mobile Friendly</div>
-                            <div class="preset-desc">720p, fast loading</div>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">Output Format</div>
+                        <div class="format-tabs">
+                            <button class="format-tab active" onclick="setFormatTab('video')" data-tab="video">Video</button>
+                            <button class="format-tab" onclick="setFormatTab('audio')" data-tab="audio">Audio</button>
+                            <button class="format-tab" onclick="setFormatTab('image')" data-tab="image">Image</button>
                         </div>
-                    </button>
-                    <button class="preset-btn" onclick="applyPreset('hq')">
-                        <span class="preset-icon">💎</span>
-                        <div class="preset-info">
-                            <div class="preset-name">High Quality</div>
-                            <div class="preset-desc">Maximum quality, larger size</div>
+                        <div class="format-grid" id="formatGrid"></div>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">Presets</div>
+                        <div class="preset-grid">
+                            <button class="preset-btn" onclick="applyPreset('web')"><span class="preset-icon">🌐</span><span class="preset-name">Web</span></button>
+                            <button class="preset-btn" onclick="applyPreset('mobile')"><span class="preset-icon">📱</span><span class="preset-name">Mobile</span></button>
+                            <button class="preset-btn" onclick="applyPreset('hq')"><span class="preset-icon">💎</span><span class="preset-name">HQ</span></button>
+                            <button class="preset-btn" onclick="applyPreset('tiny')"><span class="preset-icon">🗜️</span><span class="preset-name">Tiny</span></button>
                         </div>
-                    </button>
-                    <button class="preset-btn" onclick="applyPreset('tiny')">
-                        <span class="preset-icon">🗜️</span>
-                        <div class="preset-info">
-                            <div class="preset-name">Tiny Size</div>
-                            <div class="preset-desc">Maximum compression</div>
-                        </div>
-                    </button>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Area -->
-        <main class="main">
-            <div class="drop-zone" id="dropZone" onclick="if(!files.length) document.getElementById('fileInput').click()">
-                <input type="file" id="fileInput" multiple accept="video/*,audio/*,image/*,.mkv,.avi,.mov,.webm,.flv,.wmv,.m4v,.3gp,.flac,.aac,.ogg,.wma,.m4a">
+                    </div>
+                </aside>
                 
-                <div class="loading-overlay" id="loadingOverlay">
-                    <div class="spinner"></div>
-                    <div style="color: var(--text-1); font-size: 14px;">Loading FFmpeg...</div>
-                </div>
-
-                <div id="emptyState">
-                    <div class="drop-icon">📂</div>
-                    <div class="drop-text">Drop files here to convert</div>
-                    <div class="drop-hint">or click to browse • Supports video, audio, images</div>
-                </div>
-
-                <div id="fileListWrapper" style="display: none; width: 100%; height: 100%;">
-                    <div class="file-list-header">
-                        <h3>Files <span class="file-count" id="fileCount">0</span></h3>
-                        <div class="file-list-actions">
-                            <button onclick="event.stopPropagation(); document.getElementById('fileInput').click()">+ Add More</button>
-                            <button onclick="event.stopPropagation(); clearAll()">Clear All</button>
+                <main class="converter-main">
+                    <div class="drop-zone" id="converterDropZone">
+                        <input type="file" id="converterFileInput" multiple accept="video/*,audio/*,image/*,.mkv,.avi,.mov,.webm,.flv,.wmv,.m4v,.3gp,.flac,.aac,.ogg,.wma,.m4a">
+                        <div class="loading-overlay" id="ffmpegLoading">
+                            <div class="spinner"></div>
+                            <div style="color: var(--text-1); font-size: 13px;">Loading FFmpeg...</div>
+                        </div>
+                        <div class="drop-content" id="converterEmpty">
+                            <div class="drop-icon">📂</div>
+                            <div class="drop-text">Drop files to convert</div>
+                            <div class="drop-hint">Supports video, audio, and images</div>
                         </div>
                     </div>
-                    <div class="file-grid" id="fileList"></div>
-                </div>
-            </div>
-        </main>
-
-        <!-- Right Sidebar - Settings -->
-        <aside class="sidebar-right">
-            <div class="tabs">
-                <button class="tab active" onclick="setSettingsTab('output')" data-tab="output">Output</button>
-                <button class="tab" onclick="setSettingsTab('video')" data-tab="video">Video</button>
-                <button class="tab" onclick="setSettingsTab('audio')" data-tab="audio">Audio</button>
-                <button class="tab" onclick="setSettingsTab('advanced')" data-tab="advanced">Advanced</button>
-            </div>
-
-            <div class="section tab-content active" id="tab-output">
-                <div class="setting-group">
-                    <div class="setting-label"><span>Quality Preset</span></div>
-                    <select class="setting-select" id="qualityPreset" onchange="updateQuality()">
-                        <option value="5">Best (Slow)</option>
-                        <option value="4" selected>High</option>
-                        <option value="3">Good (Balanced)</option>
-                        <option value="2">Medium</option>
-                        <option value="1">Low (Fast)</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-label"><span>Resolution</span></div>
-                    <select class="setting-select" id="resolution">
-                        <option value="">Original</option>
-                        <option value="3840:2160">4K (3840×2160)</option>
-                        <option value="1920:1080">1080p (1920×1080)</option>
-                        <option value="1280:720">720p (1280×720)</option>
-                        <option value="854:480">480p (854×480)</option>
-                        <option value="640:360">360p (640×360)</option>
-                        <option value="custom">Custom...</option>
-                    </select>
-                </div>
-                <div class="setting-group" id="customResGroup" style="display: none;">
-                    <div class="setting-row">
-                        <div>
-                            <div class="setting-label"><span>Width</span></div>
-                            <input type="number" class="setting-input" id="customWidth" placeholder="1920">
+                    <div id="converterFileListWrapper" style="display:none; flex:1; display:flex; flex-direction:column;">
+                        <div class="file-list-header">
+                            <h3>Files <span class="file-count" id="fileCount">0</span></h3>
+                            <div class="file-list-actions">
+                                <button onclick="document.getElementById('converterFileInput').click()">+ Add</button>
+                                <button onclick="clearAllFiles()">Clear</button>
+                            </div>
                         </div>
-                        <div>
-                            <div class="setting-label"><span>Height</span></div>
-                            <input type="number" class="setting-input" id="customHeight" placeholder="1080">
+                        <div class="file-grid" id="fileList"></div>
+                    </div>
+                </main>
+                
+                <aside class="converter-settings">
+                    <div class="settings-tabs">
+                        <button class="settings-tab active" onclick="setSettingsTab('output')" data-tab="output">Output</button>
+                        <button class="settings-tab" onclick="setSettingsTab('video')" data-tab="video">Video</button>
+                        <button class="settings-tab" onclick="setSettingsTab('audio')" data-tab="audio">Audio</button>
+                        <button class="settings-tab" onclick="setSettingsTab('advanced')" data-tab="advanced">More</button>
+                    </div>
+                    <div class="section settings-content active" id="settings-output">
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Quality</span></div>
+                            <select class="setting-select" id="qualityPreset">
+                                <option value="5">Best (Slow)</option>
+                                <option value="4" selected>High</option>
+                                <option value="3">Good</option>
+                                <option value="2">Medium</option>
+                                <option value="1">Low (Fast)</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Resolution</span></div>
+                            <select class="setting-select" id="resolution">
+                                <option value="">Original</option>
+                                <option value="3840:2160">4K</option>
+                                <option value="1920:1080">1080p</option>
+                                <option value="1280:720">720p</option>
+                                <option value="854:480">480p</option>
+                                <option value="640:360">360p</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <label class="setting-checkbox"><input type="checkbox" id="keepAspect" checked> Keep aspect ratio</label>
+                        </div>
+                        <div class="setting-group">
+                            <label class="setting-checkbox"><input type="checkbox" id="stripMetadata"> Strip metadata</label>
                         </div>
                     </div>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-checkbox">
-                        <input type="checkbox" id="keepAspect" checked> Maintain aspect ratio
-                    </label>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-checkbox">
-                        <input type="checkbox" id="stripMetadata"> Strip metadata
-                    </label>
-                </div>
-            </div>
-
-            <div class="section tab-content" id="tab-video">
-                <div class="setting-group">
-                    <div class="setting-label"><span>Video Codec</span></div>
-                    <select class="setting-select" id="videoCodec">
-                        <option value="libx264">H.264 (Most Compatible)</option>
-                        <option value="libx265">H.265/HEVC (Better Compression)</option>
-                        <option value="libvpx-vp9">VP9 (WebM)</option>
-                        <option value="copy">Copy (No Re-encode)</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-label">
-                        <span>Bitrate</span>
-                        <span class="setting-value" id="videoBitrateValue">Auto</span>
+                    <div class="section settings-content" id="settings-video">
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Codec</span></div>
+                            <select class="setting-select" id="videoCodec">
+                                <option value="libx264">H.264</option>
+                                <option value="libx265">H.265/HEVC</option>
+                                <option value="libvpx-vp9">VP9</option>
+                                <option value="copy">Copy</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Bitrate</span><span class="setting-value" id="vBitrateVal">Auto</span></div>
+                            <input type="range" class="setting-slider" id="videoBitrate" min="0" max="10" value="0" oninput="updateVBitrate()">
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Frame Rate</span></div>
+                            <select class="setting-select" id="frameRate">
+                                <option value="">Original</option>
+                                <option value="60">60 fps</option>
+                                <option value="30">30 fps</option>
+                                <option value="24">24 fps</option>
+                            </select>
+                        </div>
                     </div>
-                    <input type="range" class="setting-slider" id="videoBitrate" min="0" max="10" value="0" oninput="updateVideoBitrate()">
-                </div>
-                <div class="setting-group">
-                    <div class="setting-label"><span>Frame Rate</span></div>
-                    <select class="setting-select" id="frameRate">
-                        <option value="">Original</option>
-                        <option value="60">60 fps</option>
-                        <option value="30">30 fps</option>
-                        <option value="24">24 fps</option>
-                        <option value="15">15 fps</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-checkbox">
-                        <input type="checkbox" id="twoPass"> Two-pass encoding (Better quality)
-                    </label>
-                </div>
-            </div>
-
-            <div class="section tab-content" id="tab-audio">
-                <div class="setting-group">
-                    <div class="setting-label"><span>Audio Codec</span></div>
-                    <select class="setting-select" id="audioCodec">
-                        <option value="aac">AAC</option>
-                        <option value="libmp3lame">MP3</option>
-                        <option value="libvorbis">Vorbis (OGG)</option>
-                        <option value="flac">FLAC (Lossless)</option>
-                        <option value="copy">Copy (No Re-encode)</option>
-                        <option value="none">No Audio</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-label">
-                        <span>Audio Bitrate</span>
-                        <span class="setting-value" id="audioBitrateValue">192 kbps</span>
+                    <div class="section settings-content" id="settings-audio">
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Codec</span></div>
+                            <select class="setting-select" id="audioCodec">
+                                <option value="aac">AAC</option>
+                                <option value="libmp3lame">MP3</option>
+                                <option value="libvorbis">Vorbis</option>
+                                <option value="flac">FLAC</option>
+                                <option value="copy">Copy</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Bitrate</span><span class="setting-value" id="aBitrateVal">192k</span></div>
+                            <input type="range" class="setting-slider" id="audioBitrate" min="1" max="5" value="3" oninput="updateABitrate()">
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Sample Rate</span></div>
+                            <select class="setting-select" id="sampleRate">
+                                <option value="">Original</option>
+                                <option value="48000">48 kHz</option>
+                                <option value="44100">44.1 kHz</option>
+                            </select>
+                        </div>
                     </div>
-                    <input type="range" class="setting-slider" id="audioBitrate" min="1" max="5" value="3" oninput="updateAudioBitrate()">
-                </div>
-                <div class="setting-group">
-                    <div class="setting-label"><span>Sample Rate</span></div>
-                    <select class="setting-select" id="sampleRate">
-                        <option value="">Original</option>
-                        <option value="48000">48 kHz</option>
-                        <option value="44100">44.1 kHz</option>
-                        <option value="22050">22.05 kHz</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-label"><span>Channels</span></div>
-                    <select class="setting-select" id="audioChannels">
-                        <option value="">Original</option>
-                        <option value="2">Stereo</option>
-                        <option value="1">Mono</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-checkbox">
-                        <input type="checkbox" id="normalizeAudio"> Normalize audio levels
-                    </label>
-                </div>
+                    <div class="section settings-content" id="settings-advanced">
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Trim Start (sec)</span></div>
+                            <input type="number" class="setting-input" id="trimStart" placeholder="0" min="0" step="0.1">
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Trim End (sec)</span></div>
+                            <input type="number" class="setting-input" id="trimEnd" placeholder="End" min="0" step="0.1">
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Speed</span></div>
+                            <select class="setting-select" id="speed">
+                                <option value="">1x</option>
+                                <option value="0.5">0.5x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Rotation</span></div>
+                            <select class="setting-select" id="rotation">
+                                <option value="">None</option>
+                                <option value="90">90°</option>
+                                <option value="180">180°</option>
+                                <option value="270">270°</option>
+                                <option value="hflip">H-Flip</option>
+                                <option value="vflip">V-Flip</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Custom FFmpeg</span></div>
+                            <input type="text" class="setting-input" id="customArgs" placeholder="-vf eq=brightness=0.1">
+                        </div>
+                    </div>
+                    <div class="section" style="margin-top: auto;">
+                        <button class="nav-btn primary" style="width: 100%; justify-content: center;" id="convertAllBtn" onclick="convertAll()" disabled>
+                            ⚡ Convert All
+                        </button>
+                    </div>
+                </aside>
             </div>
 
-            <div class="section tab-content" id="tab-advanced">
-                <div class="setting-group">
-                    <div class="setting-label"><span>Trim Start (seconds)</span></div>
-                    <input type="number" class="setting-input" id="trimStart" placeholder="0" min="0" step="0.1">
+            <!-- ==================== PHOTO EDITOR MODE ==================== -->
+            <div class="mode-panel photo-panel" id="photoPanel">
+                <div class="photo-toolbar">
+                    <button class="photo-tool" onclick="setPhotoTool('select')" data-tool="select" title="Select">🖱️</button>
+                    <button class="photo-tool" onclick="setPhotoTool('crop')" data-tool="crop" title="Crop">⬜</button>
+                    <button class="photo-tool" onclick="setPhotoTool('rotate')" data-tool="rotate" title="Rotate">🔄</button>
+                    <div class="photo-tool-divider"></div>
+                    <button class="photo-tool" onclick="setPhotoTool('brush')" data-tool="brush" title="Brush">🖌️</button>
+                    <button class="photo-tool" onclick="setPhotoTool('eraser')" data-tool="eraser" title="Eraser">🧽</button>
+                    <button class="photo-tool" onclick="setPhotoTool('text')" data-tool="text" title="Text">T</button>
+                    <div class="photo-tool-divider"></div>
+                    <button class="photo-tool" onclick="setPhotoTool('blur')" data-tool="blur" title="Blur">💧</button>
+                    <button class="photo-tool" onclick="setPhotoTool('sharpen')" data-tool="sharpen" title="Sharpen">🔺</button>
+                    <div class="photo-tool-divider"></div>
+                    <button class="photo-tool" onclick="photoUndo()" title="Undo">↩️</button>
+                    <button class="photo-tool" onclick="photoRedo()" title="Redo">↪️</button>
                 </div>
-                <div class="setting-group">
-                    <div class="setting-label"><span>Trim End (seconds)</span></div>
-                    <input type="number" class="setting-input" id="trimEnd" placeholder="Leave blank for end" min="0" step="0.1">
+                
+                <div class="photo-canvas-area">
+                    <div class="photo-canvas-container" id="photoCanvasContainer">
+                        <div class="photo-empty" id="photoEmpty">
+                            <div class="photo-empty-icon">🖼️</div>
+                            <div class="photo-empty-text">Open an image to edit</div>
+                            <div class="photo-empty-hint">Drag & drop or click Open</div>
+                        </div>
+                        <div class="photo-canvas-wrapper" id="photoCanvasWrapper" style="display:none;">
+                            <canvas id="photoCanvas"></canvas>
+                            <div class="crop-overlay" id="cropOverlay">
+                                <div class="crop-box" id="cropBox">
+                                    <div class="crop-handle tl"></div>
+                                    <div class="crop-handle tr"></div>
+                                    <div class="crop-handle bl"></div>
+                                    <div class="crop-handle br"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="photo-bottom-bar">
+                        <div class="photo-zoom">
+                            <button class="photo-zoom-btn" onclick="photoZoom(-10)">−</button>
+                            <span class="photo-zoom-value" id="photoZoomValue">100%</span>
+                            <button class="photo-zoom-btn" onclick="photoZoom(10)">+</button>
+                            <button class="photo-zoom-btn" onclick="photoZoomFit()" title="Fit">⊡</button>
+                        </div>
+                        <div class="photo-info" id="photoInfo">No image loaded</div>
+                    </div>
                 </div>
-                <div class="setting-group">
-                    <div class="setting-label"><span>Playback Speed</span></div>
-                    <select class="setting-select" id="speed">
-                        <option value="">Normal (1x)</option>
-                        <option value="0.5">0.5x (Slow)</option>
-                        <option value="0.75">0.75x</option>
-                        <option value="1.25">1.25x</option>
-                        <option value="1.5">1.5x</option>
-                        <option value="2">2x (Fast)</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-label"><span>Rotation</span></div>
-                    <select class="setting-select" id="rotation">
-                        <option value="">None</option>
-                        <option value="90">90° Clockwise</option>
-                        <option value="180">180°</option>
-                        <option value="270">90° Counter-clockwise</option>
-                        <option value="hflip">Flip Horizontal</option>
-                        <option value="vflip">Flip Vertical</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-label"><span>Custom FFmpeg Args</span></div>
-                    <input type="text" class="setting-input" id="customArgs" placeholder="-vf eq=brightness=0.1">
-                </div>
+                
+                <aside class="photo-sidebar">
+                    <div class="photo-section">
+                        <div class="photo-section-title">⚡ Quick Actions</div>
+                        <div class="quick-actions">
+                            <button class="quick-action" onclick="photoAutoEnhance()"><span class="icon">✨</span>Auto</button>
+                            <button class="quick-action" onclick="photoRotate(-90)"><span class="icon">↺</span>Left</button>
+                            <button class="quick-action" onclick="photoRotate(90)"><span class="icon">↻</span>Right</button>
+                            <button class="quick-action" onclick="photoFlip('h')"><span class="icon">↔</span>Flip H</button>
+                            <button class="quick-action" onclick="photoFlip('v')"><span class="icon">↕</span>Flip V</button>
+                        </div>
+                    </div>
+                    <div class="photo-section">
+                        <div class="photo-section-title">🎨 Adjustments</div>
+                        <div class="adjustment-slider">
+                            <div class="adjustment-header"><span class="adjustment-name">Brightness</span><span class="adjustment-value" id="brightnessVal">0</span></div>
+                            <input type="range" class="setting-slider" id="brightness" min="-100" max="100" value="0" oninput="updatePhotoAdjustment()">
+                        </div>
+                        <div class="adjustment-slider">
+                            <div class="adjustment-header"><span class="adjustment-name">Contrast</span><span class="adjustment-value" id="contrastVal">0</span></div>
+                            <input type="range" class="setting-slider" id="contrast" min="-100" max="100" value="0" oninput="updatePhotoAdjustment()">
+                        </div>
+                        <div class="adjustment-slider">
+                            <div class="adjustment-header"><span class="adjustment-name">Saturation</span><span class="adjustment-value" id="saturationVal">0</span></div>
+                            <input type="range" class="setting-slider" id="saturation" min="-100" max="100" value="0" oninput="updatePhotoAdjustment()">
+                        </div>
+                        <div class="adjustment-slider">
+                            <div class="adjustment-header"><span class="adjustment-name">Exposure</span><span class="adjustment-value" id="exposureVal">0</span></div>
+                            <input type="range" class="setting-slider" id="exposure" min="-100" max="100" value="0" oninput="updatePhotoAdjustment()">
+                        </div>
+                        <div class="adjustment-slider">
+                            <div class="adjustment-header"><span class="adjustment-name">Temperature</span><span class="adjustment-value" id="temperatureVal">0</span></div>
+                            <input type="range" class="setting-slider" id="temperature" min="-100" max="100" value="0" oninput="updatePhotoAdjustment()">
+                        </div>
+                        <div class="adjustment-slider">
+                            <div class="adjustment-header"><span class="adjustment-name">Sharpness</span><span class="adjustment-value" id="sharpnessVal">0</span></div>
+                            <input type="range" class="setting-slider" id="sharpness" min="0" max="100" value="0" oninput="updatePhotoAdjustment()">
+                        </div>
+                        <div class="adjustment-slider">
+                            <div class="adjustment-header"><span class="adjustment-name">Blur</span><span class="adjustment-value" id="blurVal">0</span></div>
+                            <input type="range" class="setting-slider" id="blurAmount" min="0" max="20" value="0" oninput="updatePhotoAdjustment()">
+                        </div>
+                        <button class="nav-btn" style="width:100%; margin-top:8px;" onclick="resetAdjustments()">Reset All</button>
+                    </div>
+                    <div class="photo-section">
+                        <div class="photo-section-title">🎭 Filters</div>
+                        <div class="filter-grid" id="filterGrid"></div>
+                    </div>
+                    <div class="photo-section">
+                        <div class="photo-section-title">📐 Resize</div>
+                        <div class="setting-row" style="margin-bottom:8px;">
+                            <div>
+                                <div class="setting-label"><span>Width</span></div>
+                                <input type="number" class="setting-input" id="resizeWidth" placeholder="Auto">
+                            </div>
+                            <div>
+                                <div class="setting-label"><span>Height</span></div>
+                                <input type="number" class="setting-input" id="resizeHeight" placeholder="Auto">
+                            </div>
+                        </div>
+                        <label class="setting-checkbox" style="margin-bottom:8px;"><input type="checkbox" id="resizeLock" checked> Lock aspect ratio</label>
+                        <button class="nav-btn" style="width:100%;" onclick="applyResize()">Apply Resize</button>
+                    </div>
+                    <div class="photo-section">
+                        <div class="photo-section-title">💾 Export</div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Format</span></div>
+                            <select class="setting-select" id="photoExportFormat">
+                                <option value="png">PNG</option>
+                                <option value="jpeg">JPEG</option>
+                                <option value="webp">WebP</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <div class="setting-label"><span>Quality</span><span class="setting-value" id="photoQualityVal">92%</span></div>
+                            <input type="range" class="setting-slider" id="photoQuality" min="10" max="100" value="92" oninput="document.getElementById('photoQualityVal').textContent=this.value+'%'">
+                        </div>
+                        <button class="nav-btn primary" style="width:100%;" onclick="exportPhoto()">⬇️ Export Image</button>
+                    </div>
+                </aside>
             </div>
-        </aside>
-    </div>
 
-    <!-- Preview Modal -->
-    <div class="modal-overlay" id="previewModal" onclick="if(event.target===this)closeModal()">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title" id="previewTitle">Preview</h3>
-                <button class="modal-close" onclick="closeModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <div class="preview-container" id="previewContent"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="header-btn" onclick="closeModal()">Close</button>
-                <button class="header-btn primary" id="previewDownload" onclick="downloadPreview()">⬇ Download</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeModal()">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title">Settings</h3>
-                <button class="modal-close" onclick="closeModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <div class="setting-group">
-                    <label class="setting-checkbox">
-                        <input type="checkbox" id="autoDownload"> Auto-download when conversion completes
-                    </label>
+            <!-- ==================== VIDEO EDITOR MODE ==================== -->
+            <div class="mode-panel video-panel" id="videoPanel">
+                <div class="video-main">
+                    <div class="video-preview-area">
+                        <div class="video-preview" id="videoPreview">
+                            <div class="video-preview-empty" id="videoEmpty">
+                                <div class="video-preview-empty-icon">🎬</div>
+                                <div style="font-size:14px;">Open a video to edit</div>
+                                <div style="font-size:12px; color:var(--text-3); margin-top:4px;">Drag & drop or click Open</div>
+                            </div>
+                            <video id="videoPlayer" style="display:none;" onclick="toggleVideoPlay()"></video>
+                        </div>
+                        <div class="video-controls">
+                            <button class="video-play-btn" id="videoPlayBtn" onclick="toggleVideoPlay()">▶</button>
+                            <span class="video-time" id="videoCurrentTime">0:00</span>
+                            <div class="video-scrubber" id="videoScrubber" onclick="seekVideo(event)">
+                                <div class="video-scrubber-fill" id="videoProgress" style="width:0%"></div>
+                                <div class="video-scrubber-handle" id="videoHandle" style="left:0%"></div>
+                            </div>
+                            <span class="video-time" id="videoDuration">0:00</span>
+                            <div class="video-volume">
+                                <button class="video-volume-btn" onclick="toggleMute()">🔊</button>
+                                <input type="range" class="video-volume-slider" id="videoVolume" min="0" max="1" step="0.1" value="1" oninput="setVolume(this.value)">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <aside class="video-sidebar">
+                        <div class="video-sidebar-tabs">
+                            <button class="video-sidebar-tab active" onclick="setVideoTab('edit')" data-tab="edit">Edit</button>
+                            <button class="video-sidebar-tab" onclick="setVideoTab('audio')" data-tab="audio">Audio</button>
+                            <button class="video-sidebar-tab" onclick="setVideoTab('effects')" data-tab="effects">Effects</button>
+                            <button class="video-sidebar-tab" onclick="setVideoTab('export')" data-tab="export">Export</button>
+                        </div>
+                        <div class="video-sidebar-content">
+                            <div class="video-sidebar-panel active" id="videoTab-edit">
+                                <div class="section">
+                                    <div class="section-title">Quick Actions</div>
+                                    <div class="quick-actions">
+                                        <button class="quick-action" onclick="setTrimStart()"><span class="icon">[</span>Set In</button>
+                                        <button class="quick-action" onclick="setTrimEnd()"><span class="icon">]</span>Set Out</button>
+                                        <button class="quick-action" onclick="splitAtPlayhead()"><span class="icon">✂️</span>Split</button>
+                                    </div>
+                                </div>
+                                <div class="section">
+                                    <div class="section-title">Trim</div>
+                                    <div class="setting-row">
+                                        <div>
+                                            <div class="setting-label"><span>Start</span></div>
+                                            <input type="number" class="setting-input" id="videoTrimStart" placeholder="0.0" step="0.1" min="0">
+                                        </div>
+                                        <div>
+                                            <div class="setting-label"><span>End</span></div>
+                                            <input type="number" class="setting-input" id="videoTrimEnd" placeholder="End" step="0.1" min="0">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="section">
+                                    <div class="section-title">Speed</div>
+                                    <div class="setting-group">
+                                        <div class="setting-label"><span>Playback Speed</span><span class="setting-value" id="videoSpeedVal">1x</span></div>
+                                        <input type="range" class="setting-slider" id="videoSpeed" min="0.25" max="4" step="0.25" value="1" oninput="updateVideoSpeed()">
+                                    </div>
+                                </div>
+                                <div class="section">
+                                    <div class="section-title">Transform</div>
+                                    <div class="setting-group">
+                                        <div class="setting-label"><span>Rotation</span></div>
+                                        <select class="setting-select" id="videoRotation">
+                                            <option value="">None</option>
+                                            <option value="90">90° CW</option>
+                                            <option value="180">180°</option>
+                                            <option value="270">90° CCW</option>
+                                            <option value="hflip">Flip H</option>
+                                            <option value="vflip">Flip V</option>
+                                        </select>
+                                    </div>
+                                    <div class="setting-group">
+                                        <div class="setting-label"><span>Crop</span></div>
+                                        <select class="setting-select" id="videoCrop">
+                                            <option value="">None</option>
+                                            <option value="16:9">16:9</option>
+                                            <option value="9:16">9:16 (Vertical)</option>
+                                            <option value="4:3">4:3</option>
+                                            <option value="1:1">1:1 (Square)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="video-sidebar-panel" id="videoTab-audio">
+                                <div class="section">
+                                    <div class="section-title">Audio</div>
+                                    <div class="setting-group">
+                                        <div class="setting-label"><span>Volume</span><span class="setting-value" id="audioVolVal">100%</span></div>
+                                        <input type="range" class="setting-slider" id="audioVol" min="0" max="200" value="100" oninput="document.getElementById('audioVolVal').textContent=this.value+'%'">
+                                    </div>
+                                    <div class="setting-group">
+                                        <label class="setting-checkbox"><input type="checkbox" id="audioNormalize"> Normalize audio</label>
+                                    </div>
+                                    <div class="setting-group">
+                                        <label class="setting-checkbox"><input type="checkbox" id="audioRemove"> Remove audio track</label>
+                                    </div>
+                                </div>
+                                <div class="section">
+                                    <div class="section-title">Fade</div>
+                                    <div class="setting-row">
+                                        <div>
+                                            <div class="setting-label"><span>Fade In (s)</span></div>
+                                            <input type="number" class="setting-input" id="audioFadeIn" placeholder="0" min="0" step="0.5">
+                                        </div>
+                                        <div>
+                                            <div class="setting-label"><span>Fade Out (s)</span></div>
+                                            <input type="number" class="setting-input" id="audioFadeOut" placeholder="0" min="0" step="0.5">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="video-sidebar-panel" id="videoTab-effects">
+                                <div class="section">
+                                    <div class="section-title">Color</div>
+                                    <div class="adjustment-slider">
+                                        <div class="adjustment-header"><span class="adjustment-name">Brightness</span><span class="adjustment-value" id="vBrightnessVal">0</span></div>
+                                        <input type="range" class="setting-slider" id="vBrightness" min="-1" max="1" step="0.05" value="0" oninput="document.getElementById('vBrightnessVal').textContent=Math.round(this.value*100)">
+                                    </div>
+                                    <div class="adjustment-slider">
+                                        <div class="adjustment-header"><span class="adjustment-name">Contrast</span><span class="adjustment-value" id="vContrastVal">0</span></div>
+                                        <input type="range" class="setting-slider" id="vContrast" min="-1" max="1" step="0.05" value="0" oninput="document.getElementById('vContrastVal').textContent=Math.round(this.value*100)">
+                                    </div>
+                                    <div class="adjustment-slider">
+                                        <div class="adjustment-header"><span class="adjustment-name">Saturation</span><span class="adjustment-value" id="vSaturationVal">0</span></div>
+                                        <input type="range" class="setting-slider" id="vSaturation" min="-1" max="1" step="0.05" value="0" oninput="document.getElementById('vSaturationVal').textContent=Math.round(this.value*100)">
+                                    </div>
+                                </div>
+                                <div class="section">
+                                    <div class="section-title">Effects</div>
+                                    <div class="setting-group">
+                                        <label class="setting-checkbox"><input type="checkbox" id="effectGrayscale"> Grayscale</label>
+                                    </div>
+                                    <div class="setting-group">
+                                        <label class="setting-checkbox"><input type="checkbox" id="effectSepia"> Sepia</label>
+                                    </div>
+                                    <div class="setting-group">
+                                        <label class="setting-checkbox"><input type="checkbox" id="effectNegative"> Negative</label>
+                                    </div>
+                                    <div class="setting-group">
+                                        <label class="setting-checkbox"><input type="checkbox" id="effectVignette"> Vignette</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="video-sidebar-panel" id="videoTab-export">
+                                <div class="section">
+                                    <div class="section-title">Output</div>
+                                    <div class="setting-group">
+                                        <div class="setting-label"><span>Format</span></div>
+                                        <select class="setting-select" id="videoExportFormat">
+                                            <option value="mp4">MP4</option>
+                                            <option value="webm">WebM</option>
+                                            <option value="gif">GIF</option>
+                                            <option value="mp3">MP3 (Audio only)</option>
+                                        </select>
+                                    </div>
+                                    <div class="setting-group">
+                                        <div class="setting-label"><span>Quality</span></div>
+                                        <select class="setting-select" id="videoExportQuality">
+                                            <option value="5">Best</option>
+                                            <option value="4" selected>High</option>
+                                            <option value="3">Good</option>
+                                            <option value="2">Medium</option>
+                                            <option value="1">Low</option>
+                                        </select>
+                                    </div>
+                                    <div class="setting-group">
+                                        <div class="setting-label"><span>Resolution</span></div>
+                                        <select class="setting-select" id="videoExportRes">
+                                            <option value="">Original</option>
+                                            <option value="1920:1080">1080p</option>
+                                            <option value="1280:720">720p</option>
+                                            <option value="854:480">480p</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="section">
+                                    <button class="nav-btn primary" style="width:100%;" onclick="exportVideo()">⬇️ Export Video</button>
+                                    <div style="text-align:center; margin-top:8px; font-size:11px; color:var(--text-2);" id="exportStatus"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
                 </div>
-                <div class="setting-group">
-                    <label class="setting-checkbox">
-                        <input type="checkbox" id="showNotifications" checked> Show notifications
-                    </label>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-checkbox">
-                        <input type="checkbox" id="preserveFiles"> Keep original files in list after conversion
-                    </label>
-                </div>
-                <div class="setting-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-                    <div class="setting-label"><span>FFmpeg Status</span></div>
-                    <div id="ffmpegInfo" style="font-size: 12px; color: var(--text-2);"></div>
+                
+                <div class="video-timeline">
+                    <div class="timeline-toolbar">
+                        <button class="timeline-btn" onclick="document.getElementById('globalFileInput').click()">📁 Add Media</button>
+                        <button class="timeline-btn" onclick="extractFrames()">🖼️ Extract Frames</button>
+                        <button class="timeline-btn" onclick="extractAudio()">🎵 Extract Audio</button>
+                        <div class="timeline-zoom">
+                            <button class="timeline-zoom-btn" onclick="timelineZoom(-1)">−</button>
+                            <button class="timeline-zoom-btn" onclick="timelineZoom(1)">+</button>
+                        </div>
+                    </div>
+                    <div class="timeline-tracks" id="timelineTracks">
+                        <div class="timeline-track" id="videoTrack">
+                            <div style="padding:0 12px; font-size:10px; color:var(--text-3);">Drop video here or click Add Media</div>
+                        </div>
+                        <div class="timeline-playhead" id="timelinePlayhead" style="left:0"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -552,460 +871,968 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <script>
-        // ===== State =====
-        let ffmpeg = null, ffmpegLoaded = false, files = [], currentTool = 'convert', currentFormatTab = 'video', selectedFormat = 'mp4';
-        let previewFileId = null;
+    // ===== Global State =====
+    let ffmpeg = null, ffmpegLoaded = false;
+    let currentMode = 'converter';
+    let converterFiles = [], selectedFormat = 'mp4', currentFormatTab = 'video';
+    
+    // Photo editor state
+    let photoCanvas, photoCtx, originalImage = null, photoHistory = [], photoHistoryIndex = -1;
+    let photoZoomLevel = 100, currentPhotoTool = 'select', currentFilter = 'none';
+    let photoAdjustments = { brightness: 0, contrast: 0, saturation: 0, exposure: 0, temperature: 0, sharpness: 0, blur: 0 };
+    
+    // Video editor state
+    let videoFile = null, videoPlayer;
+    
+    const formats = {
+        video: ['mp4', 'webm', 'mkv', 'avi', 'mov', 'gif', 'ts'],
+        audio: ['mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a'],
+        image: ['png', 'jpg', 'webp', 'bmp', 'gif', 'ico']
+    };
+    
+    const filters = [
+        { id: 'none', name: 'None' },
+        { id: 'grayscale', name: 'B&W' },
+        { id: 'sepia', name: 'Sepia' },
+        { id: 'vintage', name: 'Vintage' },
+        { id: 'cold', name: 'Cold' },
+        { id: 'warm', name: 'Warm' },
+        { id: 'dramatic', name: 'Drama' },
+        { id: 'fade', name: 'Fade' },
+        { id: 'vivid', name: 'Vivid' }
+    ];
+    
+    const qualityCRF = { 1: 35, 2: 28, 3: 23, 4: 20, 5: 16 };
+    const audioBitrates = ['96', '128', '192', '256', '320'];
+    const videoBitrates = ['Auto', '1M', '2M', '4M', '6M', '8M', '10M', '15M', '20M', '30M', '50M'];
 
-        const formats = {
-            video: ['mp4', 'webm', 'mkv', 'avi', 'mov', 'gif', 'ts', 'flv', 'wmv'],
-            audio: ['mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a', 'wma', 'opus'],
-            image: ['jpg', 'png', 'webp', 'bmp', 'gif', 'tiff', 'ico']
-        };
+    // ===== Init =====
+    document.addEventListener('DOMContentLoaded', async () => {
+        photoCanvas = document.getElementById('photoCanvas');
+        photoCtx = photoCanvas.getContext('2d');
+        videoPlayer = document.getElementById('videoPlayer');
+        
+        setupEventListeners();
+        renderFormats();
+        renderFilters();
+        await initFFmpeg();
+    });
 
-        const qualityCRF = { 1: 35, 2: 28, 3: 23, 4: 20, 5: 16 };
-        const audioBitrates = ['96', '128', '192', '256', '320'];
-        const videoBitrates = ['Auto', '1M', '2M', '4M', '6M', '8M', '10M', '15M', '20M', '30M', '50M'];
+    async function initFFmpeg() {
+        await window.coiReady;
+        
+        if (typeof SharedArrayBuffer === 'undefined') {
+            document.getElementById('ffmpegLoading').innerHTML = `
+                <div style="text-align:center;padding:20px;">
+                    <div style="font-size:36px;margin-bottom:12px;">⚠️</div>
+                    <div style="font-size:14px;margin-bottom:8px;">Setup Required</div>
+                    <button class="nav-btn primary" onclick="location.reload()">Refresh Page</button>
+                </div>`;
+            return;
+        }
 
-        // ===== Init =====
-        document.addEventListener('DOMContentLoaded', async () => {
-            setupEventListeners();
-            renderFormats();
-            await initFFmpeg();
+        try {
+            const { createFFmpeg, fetchFile } = FFmpeg;
+            ffmpeg = createFFmpeg({
+                log: true,
+                corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js',
+                progress: ({ ratio }) => updateProgress(Math.round(ratio * 100))
+            });
+            window.ffmpegFetchFile = fetchFile;
+            await ffmpeg.load();
+            ffmpegLoaded = true;
+            
+            document.getElementById('ffmpegLoading').style.display = 'none';
+            document.getElementById('statusDot').classList.add('ready');
+            document.getElementById('statusDot').title = 'Ready';
+        } catch (err) {
+            console.error('FFmpeg load error:', err);
+            document.getElementById('ffmpegLoading').innerHTML = `<div style="text-align:center;color:var(--error);">Failed to load: ${err.message}</div>`;
+            document.getElementById('statusDot').classList.add('error');
+        }
+    }
+
+    // ===== Event Listeners =====
+    function setupEventListeners() {
+        // Global file input
+        document.getElementById('globalFileInput').addEventListener('change', e => handleGlobalFiles(e.target.files));
+        
+        // Converter drop zone
+        const dropZone = document.getElementById('converterDropZone');
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleConverterFiles(e.dataTransfer.files); });
+        dropZone.addEventListener('click', e => { if (!converterFiles.length) document.getElementById('converterFileInput').click(); });
+        document.getElementById('converterFileInput').addEventListener('change', e => handleConverterFiles(e.target.files));
+        
+        // Photo editor drop
+        const photoContainer = document.getElementById('photoCanvasContainer');
+        photoContainer.addEventListener('dragover', e => { e.preventDefault(); });
+        photoContainer.addEventListener('drop', e => { e.preventDefault(); handlePhotoFile(e.dataTransfer.files[0]); });
+        
+        // Video editor drop
+        const videoPreview = document.getElementById('videoPreview');
+        videoPreview.addEventListener('dragover', e => { e.preventDefault(); });
+        videoPreview.addEventListener('drop', e => { e.preventDefault(); handleVideoFile(e.dataTransfer.files[0]); });
+        
+        // Video player events
+        videoPlayer.addEventListener('timeupdate', updateVideoTime);
+        videoPlayer.addEventListener('loadedmetadata', onVideoLoaded);
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', e => {
+            if (e.key === ' ' && currentMode === 'video' && videoFile) { e.preventDefault(); toggleVideoPlay(); }
+            if (e.ctrlKey && e.key === 'z') { if (currentMode === 'photo') photoUndo(); }
+            if (e.ctrlKey && e.key === 'y') { if (currentMode === 'photo') photoRedo(); }
         });
 
-        async function initFFmpeg() {
-            await window.coiReady;
-            
-            if (typeof SharedArrayBuffer === 'undefined') {
-                document.getElementById('loadingOverlay').innerHTML = `
-                    <div style="text-align: center; padding: 20px;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
-                        <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Setup Required</div>
-                        <div style="font-size: 13px; color: var(--text-2); margin-bottom: 16px;">Please refresh the page to complete setup</div>
-                        <button class="header-btn primary" onclick="location.reload()">Refresh Page</button>
-                    </div>
-                `;
-                document.getElementById('statusBadge').textContent = 'Setup Required';
-                document.getElementById('statusBadge').className = 'status-badge error';
-                return;
+        // Resize width/height sync
+        document.getElementById('resizeWidth').addEventListener('input', e => {
+            if (document.getElementById('resizeLock').checked && originalImage) {
+                const ratio = originalImage.height / originalImage.width;
+                document.getElementById('resizeHeight').value = Math.round(e.target.value * ratio);
             }
+        });
+        document.getElementById('resizeHeight').addEventListener('input', e => {
+            if (document.getElementById('resizeLock').checked && originalImage) {
+                const ratio = originalImage.width / originalImage.height;
+                document.getElementById('resizeWidth').value = Math.round(e.target.value * ratio);
+            }
+        });
+    }
 
-            try {
-                const { createFFmpeg, fetchFile } = FFmpeg;
-                ffmpeg = createFFmpeg({
-                    log: true,
-                    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js',
-                    progress: ({ ratio }) => updateConversionProgress(Math.round(ratio * 100))
-                });
-                window.ffmpegFetchFile = fetchFile;
-                await ffmpeg.load();
-                ffmpegLoaded = true;
-                
-                document.getElementById('loadingOverlay').style.display = 'none';
-                document.getElementById('statusBadge').textContent = 'Ready';
-                document.getElementById('statusBadge').className = 'status-badge ready';
-                document.getElementById('ffmpegInfo').textContent = 'FFmpeg.wasm v0.10.1 loaded successfully';
-            } catch (err) {
-                console.error('FFmpeg load error:', err);
-                document.getElementById('loadingOverlay').innerHTML = `
-                    <div style="text-align: center; padding: 20px;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
-                        <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Failed to Load</div>
-                        <div style="font-size: 13px; color: var(--text-2);">${err.message}</div>
-                    </div>
-                `;
-                document.getElementById('statusBadge').textContent = 'Error';
-                document.getElementById('statusBadge').className = 'status-badge error';
+    function handleGlobalFiles(fileList) {
+        const file = fileList[0];
+        if (!file) return;
+        
+        if (file.type.startsWith('image/')) {
+            setMode('photo');
+            handlePhotoFile(file);
+        } else if (file.type.startsWith('video/') || file.name.match(/\.(mkv|avi|mov|webm|flv|wmv)$/i)) {
+            setMode('video');
+            handleVideoFile(file);
+        } else if (file.type.startsWith('audio/')) {
+            setMode('converter');
+            handleConverterFiles(fileList);
+        } else {
+            handleConverterFiles(fileList);
+        }
+    }
+
+    // ===== Mode Switching =====
+    function setMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+        document.querySelectorAll('.mode-panel').forEach(p => p.classList.toggle('active', p.id === mode + 'Panel'));
+        updateExportButton();
+    }
+
+    function updateExportButton() {
+        const btn = document.getElementById('exportBtn');
+        if (currentMode === 'converter') {
+            btn.disabled = !ffmpegLoaded || converterFiles.length === 0;
+            btn.onclick = convertAll;
+        } else if (currentMode === 'photo') {
+            btn.disabled = !originalImage;
+            btn.onclick = exportPhoto;
+        } else if (currentMode === 'video') {
+            btn.disabled = !videoFile || !ffmpegLoaded;
+            btn.onclick = exportVideo;
+        }
+    }
+
+    // ==================== CONVERTER MODE ====================
+    function handleConverterFiles(fileList) {
+        for (const file of fileList) {
+            const type = getFileType(file);
+            if (type) {
+                const id = Date.now() + Math.random();
+                const thumb = (type === 'image' || type === 'video') ? URL.createObjectURL(file) : null;
+                converterFiles.push({ id, file, name: file.name, size: file.size, type, status: 'pending', progress: 0, thumb, converted: null });
             }
         }
+        renderConverterFiles();
+        updateExportButton();
+    }
 
-        // ===== Event Listeners =====
-        function setupEventListeners() {
-            const dropZone = document.getElementById('dropZone');
-            const fileInput = document.getElementById('fileInput');
+    function getFileType(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (['mp4','webm','mkv','avi','mov','flv','wmv','m4v','3gp','ts'].includes(ext) || file.type.startsWith('video/')) return 'video';
+        if (['mp3','wav','ogg','flac','aac','m4a','wma','opus'].includes(ext) || file.type.startsWith('audio/')) return 'audio';
+        if (['jpg','jpeg','png','gif','webp','bmp','tiff','ico'].includes(ext) || file.type.startsWith('image/')) return 'image';
+        return null;
+    }
 
-            dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-            dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
-            fileInput.addEventListener('change', e => handleFiles(e.target.files));
+    function formatSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
 
-            document.getElementById('resolution').addEventListener('change', e => {
-                document.getElementById('customResGroup').style.display = e.target.value === 'custom' ? 'block' : 'none';
-            });
+    function renderConverterFiles() {
+        const list = document.getElementById('fileList');
+        const wrapper = document.getElementById('converterFileListWrapper');
+        const empty = document.getElementById('converterEmpty');
+        const dropZone = document.getElementById('converterDropZone');
 
-            document.addEventListener('keydown', e => {
-                if (e.key === 'Escape') closeModal();
-                if (e.ctrlKey && e.key === 'Enter' && files.length && ffmpegLoaded) convertAll();
-            });
+        if (converterFiles.length === 0) {
+            wrapper.style.display = 'none';
+            empty.style.display = 'block';
+            dropZone.classList.remove('has-files');
+            document.getElementById('convertAllBtn').disabled = true;
+            return;
         }
 
-        // ===== File Handling =====
-        function handleFiles(fileList) {
-            for (const file of fileList) {
-                const type = getFileType(file);
-                if (type) {
-                    const id = Date.now() + Math.random();
-                    const thumb = type === 'image' || type === 'video' ? URL.createObjectURL(file) : null;
-                    files.push({ id, file, name: file.name, size: file.size, type, status: 'pending', progress: 0, thumb, converted: null });
-                }
-            }
-            renderFiles();
-            updateUI();
-        }
+        wrapper.style.display = 'flex';
+        empty.style.display = 'none';
+        dropZone.classList.add('has-files');
+        document.getElementById('fileCount').textContent = converterFiles.length;
+        document.getElementById('convertAllBtn').disabled = !ffmpegLoaded;
 
-        function getFileType(file) {
-            const ext = file.name.split('.').pop().toLowerCase();
-            const videoExts = ['mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'm4v', '3gp', 'ts'];
-            const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'opus'];
-            const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'ico'];
-            if (videoExts.includes(ext) || file.type.startsWith('video/')) return 'video';
-            if (audioExts.includes(ext) || file.type.startsWith('audio/')) return 'audio';
-            if (imageExts.includes(ext) || file.type.startsWith('image/')) return 'image';
-            return null;
-        }
-
-        function formatSize(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        }
-
-        function renderFiles() {
-            const list = document.getElementById('fileList');
-            const wrapper = document.getElementById('fileListWrapper');
-            const empty = document.getElementById('emptyState');
-            const dropZone = document.getElementById('dropZone');
-
-            if (files.length === 0) {
-                wrapper.style.display = 'none';
-                empty.style.display = 'block';
-                dropZone.classList.remove('has-files');
-                return;
-            }
-
-            wrapper.style.display = 'block';
-            empty.style.display = 'none';
-            dropZone.classList.add('has-files');
-            document.getElementById('fileCount').textContent = files.length;
-
-            list.innerHTML = files.map(f => `
-                <div class="file-item ${f.status}" data-id="${f.id}">
-                    <div class="file-thumb">
-                        ${f.thumb && f.type === 'image' ? `<img src="${f.thumb}" alt="">` : 
-                          f.thumb && f.type === 'video' ? `<video src="${f.thumb}" muted></video>` :
-                          f.type === 'video' ? '🎬' : f.type === 'audio' ? '🎵' : '🖼️'}
-                    </div>
-                    <div class="file-info">
-                        <div class="file-name">${f.name}</div>
-                        <div class="file-meta">
-                            <span>${formatSize(f.size)}</span>
-                            <span>${f.type}</span>
-                            ${f.status === 'done' ? `<span style="color:var(--success)">→ ${formatSize(f.convertedSize)}</span>` : ''}
-                            ${f.status === 'converting' ? `<span style="color:var(--accent)">${f.progress}%</span>` : ''}
-                        </div>
-                        ${f.status === 'converting' ? `<div class="file-progress"><div class="file-progress-bar" style="width:${f.progress}%"></div></div>` : ''}
-                    </div>
-                    <div class="file-actions">
-                        ${f.status === 'done' ? `
-                            <button class="file-action download" onclick="event.stopPropagation();downloadFile('${f.id}')" title="Download">⬇</button>
-                            <button class="file-action" onclick="event.stopPropagation();previewFile('${f.id}')" title="Preview">👁</button>
-                        ` : ''}
-                        <button class="file-action" onclick="event.stopPropagation();removeFile('${f.id}')" title="Remove">✕</button>
-                    </div>
+        list.innerHTML = converterFiles.map(f => `
+            <div class="file-item ${f.status}" data-id="${f.id}">
+                <div class="file-thumb">
+                    ${f.thumb && f.type === 'image' ? `<img src="${f.thumb}">` : 
+                      f.thumb && f.type === 'video' ? `<video src="${f.thumb}" muted></video>` :
+                      f.type === 'video' ? '🎬' : f.type === 'audio' ? '🎵' : '🖼️'}
                 </div>
-            `).join('');
+                <div class="file-info">
+                    <div class="file-name">${f.name}</div>
+                    <div class="file-meta">
+                        <span>${formatSize(f.size)}</span>
+                        ${f.status === 'done' ? `<span style="color:var(--success)">→ ${formatSize(f.convertedSize)}</span>` : ''}
+                        ${f.status === 'converting' ? `<span style="color:var(--accent)">${f.progress}%</span>` : ''}
+                    </div>
+                    ${f.status === 'converting' ? `<div class="file-progress"><div class="file-progress-bar" style="width:${f.progress}%"></div></div>` : ''}
+                </div>
+                <div class="file-actions">
+                    ${f.status === 'done' ? `<button class="file-action download" onclick="downloadConverted('${f.id}')" title="Download">⬇</button>` : ''}
+                    <button class="file-action" onclick="removeConverterFile('${f.id}')" title="Remove">✕</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function removeConverterFile(id) { converterFiles = converterFiles.filter(f => f.id != id); renderConverterFiles(); updateExportButton(); }
+    function clearAllFiles() { converterFiles = []; renderConverterFiles(); updateExportButton(); }
+
+    function setConvertTool(tool) {
+        document.querySelectorAll('.converter-sidebar .tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+        if (tool === 'extract') { setFormatTab('audio'); selectFormat('mp3'); }
+        else if (tool === 'gif') { setFormatTab('video'); selectFormat('gif'); }
+    }
+
+    function setFormatTab(tab) {
+        currentFormatTab = tab;
+        document.querySelectorAll('.format-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+        renderFormats();
+    }
+
+    function renderFormats() {
+        document.getElementById('formatGrid').innerHTML = formats[currentFormatTab].map(f => 
+            `<button class="format-btn ${f === selectedFormat ? 'selected' : ''}" onclick="selectFormat('${f}')">${f}</button>`
+        ).join('');
+    }
+
+    function selectFormat(fmt) { selectedFormat = fmt; renderFormats(); }
+
+    function applyPreset(preset) {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        event.target.closest('.preset-btn').classList.add('active');
+        const presets = {
+            web: { format: 'mp4', quality: '3', resolution: '1280:720' },
+            mobile: { format: 'mp4', quality: '2', resolution: '854:480' },
+            hq: { format: 'mp4', quality: '5', resolution: '' },
+            tiny: { format: 'mp4', quality: '1', resolution: '640:360' }
+        };
+        const p = presets[preset];
+        selectFormat(p.format);
+        document.getElementById('qualityPreset').value = p.quality;
+        document.getElementById('resolution').value = p.resolution;
+    }
+
+    function setSettingsTab(tab) {
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+        document.querySelectorAll('.settings-content').forEach(c => c.classList.toggle('active', c.id === 'settings-' + tab));
+    }
+
+    function updateVBitrate() { document.getElementById('vBitrateVal').textContent = videoBitrates[document.getElementById('videoBitrate').value]; }
+    function updateABitrate() { document.getElementById('aBitrateVal').textContent = audioBitrates[document.getElementById('audioBitrate').value - 1] + 'k'; }
+
+    async function convertAll() {
+        if (!ffmpegLoaded || converterFiles.length === 0) return;
+        for (const f of converterFiles) {
+            if (f.status === 'done') continue;
+            await convertFile(f);
+        }
+        toast('success', 'All conversions complete!');
+        updateExportButton();
+    }
+
+    async function convertFile(fileObj) {
+        fileObj.status = 'converting';
+        fileObj.progress = 0;
+        renderConverterFiles();
+
+        const inputExt = fileObj.name.split('.').pop();
+        const inputName = `input.${inputExt}`;
+        const outputName = `output.${selectedFormat}`;
+
+        try {
+            ffmpeg.FS('writeFile', inputName, await window.ffmpegFetchFile(fileObj.file));
+            const args = buildFFmpegArgs(inputName, outputName);
+            await ffmpeg.run(...args);
+
+            const data = ffmpeg.FS('readFile', outputName);
+            const blob = new Blob([data.buffer], { type: getMimeType(selectedFormat) });
+
+            fileObj.converted = URL.createObjectURL(blob);
+            fileObj.convertedSize = blob.size;
+            fileObj.convertedName = fileObj.name.replace(/\.[^/.]+$/, '') + '.' + selectedFormat;
+            fileObj.status = 'done';
+
+            ffmpeg.FS('unlink', inputName);
+            ffmpeg.FS('unlink', outputName);
+        } catch (err) {
+            console.error('Conversion error:', err);
+            fileObj.status = 'error';
+            toast('error', `Failed: ${fileObj.name}`);
+        }
+        renderConverterFiles();
+    }
+
+    function buildFFmpegArgs(input, output) {
+        const args = [];
+        const trimStart = document.getElementById('trimStart').value;
+        const trimEnd = document.getElementById('trimEnd').value;
+
+        if (trimStart) args.push('-ss', trimStart);
+        args.push('-i', input);
+        if (trimEnd) args.push('-t', String(trimEnd - (trimStart || 0)));
+
+        const isVideo = ['mp4', 'webm', 'mkv', 'avi', 'mov', 'gif', 'ts'].includes(selectedFormat);
+        const isAudio = ['mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a'].includes(selectedFormat);
+
+        if (isVideo && selectedFormat !== 'gif') {
+            const codec = document.getElementById('videoCodec').value;
+            if (codec !== 'copy') {
+                args.push('-c:v', codec);
+                const quality = document.getElementById('qualityPreset').value;
+                if (codec === 'libx264' || codec === 'libx265') args.push('-crf', String(qualityCRF[quality]));
+                const bitrate = document.getElementById('videoBitrate').value;
+                if (bitrate > 0) args.push('-b:v', videoBitrates[bitrate]);
+            } else {
+                args.push('-c:v', 'copy');
+            }
+
+            const vf = [];
+            const res = document.getElementById('resolution').value;
+            if (res) {
+                const [w, h] = res.split(':');
+                vf.push(document.getElementById('keepAspect').checked ? 
+                    `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2` :
+                    `scale=${w}:${h}`);
+            }
+
+            const fps = document.getElementById('frameRate').value;
+            if (fps) vf.push(`fps=${fps}`);
+
+            const rotation = document.getElementById('rotation').value;
+            if (rotation === 'hflip' || rotation === 'vflip') vf.push(rotation);
+            else if (rotation) vf.push(`rotate=${rotation}*PI/180`);
+
+            const speed = document.getElementById('speed').value;
+            if (speed) vf.push(`setpts=${1/parseFloat(speed)}*PTS`);
+
+            if (vf.length > 0) args.push('-vf', vf.join(','));
+
+            const audioCodec = document.getElementById('audioCodec').value;
+            if (audioCodec === 'none') args.push('-an');
+            else if (audioCodec !== 'copy') {
+                args.push('-c:a', audioCodec);
+                const ab = audioBitrates[document.getElementById('audioBitrate').value - 1];
+                args.push('-b:a', ab + 'k');
+                if (speed) args.push('-af', `atempo=${speed}`);
+            } else args.push('-c:a', 'copy');
+        } else if (selectedFormat === 'gif') {
+            const res = document.getElementById('resolution').value;
+            const scale = res ? res.split(':')[0] : '480';
+            args.push('-vf', `fps=15,scale=${scale}:-1:flags=lanczos`, '-loop', '0');
+        } else if (isAudio) {
+            const codec = { mp3: 'libmp3lame', aac: 'aac', ogg: 'libvorbis', flac: 'flac', wav: null, m4a: 'aac' }[selectedFormat];
+            if (codec) args.push('-c:a', codec);
+            const ab = audioBitrates[document.getElementById('audioBitrate').value - 1];
+            if (!['flac', 'wav'].includes(selectedFormat)) args.push('-b:a', ab + 'k');
+            const sr = document.getElementById('sampleRate').value;
+            if (sr) args.push('-ar', sr);
         }
 
-        function removeFile(id) { files = files.filter(f => f.id != id); renderFiles(); updateUI(); }
-        function clearAll() { files = []; renderFiles(); updateUI(); }
-        function updateUI() { document.getElementById('convertBtn').disabled = !ffmpegLoaded || files.length === 0 || files.every(f => f.status === 'done'); }
+        if (document.getElementById('stripMetadata').checked) args.push('-map_metadata', '-1');
+        const customArgs = document.getElementById('customArgs').value.trim();
+        if (customArgs) args.push(...customArgs.split(' '));
+        args.push('-y', output);
+        return args;
+    }
 
-        // ===== Tools & Formats =====
-        function setTool(tool) {
-            currentTool = tool;
-            document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+    function updateProgress(progress) {
+        const f = converterFiles.find(f => f.status === 'converting');
+        if (f) { f.progress = progress; renderConverterFiles(); }
+    }
+
+    function downloadConverted(id) {
+        const f = converterFiles.find(f => f.id == id);
+        if (f?.converted) {
+            const a = document.createElement('a');
+            a.href = f.converted;
+            a.download = f.convertedName;
+            a.click();
+        }
+    }
+
+    function getMimeType(fmt) {
+        const types = { mp4: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska', avi: 'video/x-msvideo', mov: 'video/quicktime', gif: 'image/gif', mp3: 'audio/mpeg', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', flac: 'audio/flac', m4a: 'audio/mp4', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', bmp: 'image/bmp', ico: 'image/x-icon' };
+        return types[fmt] || 'application/octet-stream';
+    }
+
+    // ==================== PHOTO EDITOR MODE ====================
+    function handlePhotoFile(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        
+        const img = new Image();
+        img.onload = () => {
+            originalImage = img;
+            photoCanvas.width = img.width;
+            photoCanvas.height = img.height;
             
-            // Auto-select appropriate format
-            if (tool === 'extract') { setFormatTab('audio'); selectFormat('mp3'); }
-            else if (tool === 'gif') { setFormatTab('video'); selectFormat('gif'); }
-            else if (tool === 'resize' && currentFormatTab === 'audio') { setFormatTab('video'); }
+            // Reset adjustments
+            resetAdjustments();
+            
+            // Save initial state
+            photoHistory = [];
+            photoHistoryIndex = -1;
+            savePhotoState();
+            
+            // Render
+            renderPhoto();
+            
+            // Update UI
+            document.getElementById('photoEmpty').style.display = 'none';
+            document.getElementById('photoCanvasWrapper').style.display = 'block';
+            document.getElementById('photoInfo').textContent = `${img.width} × ${img.height}`;
+            document.getElementById('resizeWidth').value = img.width;
+            document.getElementById('resizeHeight').value = img.height;
+            
+            photoZoomFit();
+            updateExportButton();
+        };
+        img.src = URL.createObjectURL(file);
+    }
+
+    function renderPhoto() {
+        if (!originalImage) return;
+        
+        // Clear canvas
+        photoCtx.clearRect(0, 0, photoCanvas.width, photoCanvas.height);
+        
+        // Draw original image
+        photoCtx.drawImage(originalImage, 0, 0, photoCanvas.width, photoCanvas.height);
+        
+        // Get image data for processing
+        const imageData = photoCtx.getImageData(0, 0, photoCanvas.width, photoCanvas.height);
+        const data = imageData.data;
+        
+        // Apply adjustments
+        const brightness = photoAdjustments.brightness / 100;
+        const contrast = (photoAdjustments.contrast + 100) / 100;
+        const saturation = (photoAdjustments.saturation + 100) / 100;
+        const exposure = Math.pow(2, photoAdjustments.exposure / 100);
+        const temperature = photoAdjustments.temperature / 100;
+        
+        for (let i = 0; i < data.length; i += 4) {
+            let r = data[i], g = data[i + 1], b = data[i + 2];
+            
+            // Exposure
+            r *= exposure; g *= exposure; b *= exposure;
+            
+            // Brightness
+            r += brightness * 255; g += brightness * 255; b += brightness * 255;
+            
+            // Contrast
+            r = ((r / 255 - 0.5) * contrast + 0.5) * 255;
+            g = ((g / 255 - 0.5) * contrast + 0.5) * 255;
+            b = ((b / 255 - 0.5) * contrast + 0.5) * 255;
+            
+            // Temperature
+            if (temperature > 0) { r += temperature * 30; b -= temperature * 30; }
+            else { r += temperature * 30; b -= temperature * 30; }
+            
+            // Saturation
+            const gray = 0.2989 * r + 0.587 * g + 0.114 * b;
+            r = gray + saturation * (r - gray);
+            g = gray + saturation * (g - gray);
+            b = gray + saturation * (b - gray);
+            
+            // Apply filter
+            [r, g, b] = applyFilter(r, g, b, currentFilter);
+            
+            data[i] = Math.max(0, Math.min(255, r));
+            data[i + 1] = Math.max(0, Math.min(255, g));
+            data[i + 2] = Math.max(0, Math.min(255, b));
         }
-
-        function setFormatTab(tab) {
-            currentFormatTab = tab;
-            document.querySelectorAll('.format-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-            renderFormats();
+        
+        photoCtx.putImageData(imageData, 0, 0);
+        
+        // Apply blur (canvas filter)
+        if (photoAdjustments.blur > 0) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = photoCanvas.width;
+            tempCanvas.height = photoCanvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.filter = `blur(${photoAdjustments.blur}px)`;
+            tempCtx.drawImage(photoCanvas, 0, 0);
+            photoCtx.drawImage(tempCanvas, 0, 0);
         }
+    }
 
-        function renderFormats() {
-            const grid = document.getElementById('formatGrid');
-            grid.innerHTML = formats[currentFormatTab].map(f => 
-                `<button class="format-btn ${f === selectedFormat ? 'selected' : ''}" onclick="selectFormat('${f}')">${f}</button>`
-            ).join('');
+    function applyFilter(r, g, b, filter) {
+        switch (filter) {
+            case 'grayscale':
+                const gray = 0.2989 * r + 0.587 * g + 0.114 * b;
+                return [gray, gray, gray];
+            case 'sepia':
+                return [r * 0.393 + g * 0.769 + b * 0.189, r * 0.349 + g * 0.686 + b * 0.168, r * 0.272 + g * 0.534 + b * 0.131];
+            case 'vintage':
+                return [r * 0.9 + 40, g * 0.8 + 20, b * 0.6];
+            case 'cold':
+                return [r * 0.9, g, b * 1.1 + 20];
+            case 'warm':
+                return [r * 1.1 + 20, g * 1.05, b * 0.9];
+            case 'dramatic':
+                const dGray = 0.2989 * r + 0.587 * g + 0.114 * b;
+                return [r * 0.6 + dGray * 0.4, g * 0.6 + dGray * 0.4, b * 0.6 + dGray * 0.4];
+            case 'fade':
+                return [r * 0.9 + 25, g * 0.9 + 25, b * 0.9 + 25];
+            case 'vivid':
+                const vGray = 0.2989 * r + 0.587 * g + 0.114 * b;
+                return [vGray + 1.5 * (r - vGray), vGray + 1.5 * (g - vGray), vGray + 1.5 * (b - vGray)];
+            default:
+                return [r, g, b];
         }
+    }
 
-        function selectFormat(fmt) {
-            selectedFormat = fmt;
-            renderFormats();
+    function renderFilters() {
+        document.getElementById('filterGrid').innerHTML = filters.map(f => `
+            <button class="filter-btn ${f.id === currentFilter ? 'active' : ''}" onclick="setFilter('${f.id}')">
+                <div style="width:100%;height:100%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:20px;">${f.id === 'none' ? '🚫' : f.id === 'grayscale' ? '⚫' : f.id === 'sepia' ? '🟤' : f.id === 'vintage' ? '📷' : f.id === 'cold' ? '❄️' : f.id === 'warm' ? '☀️' : f.id === 'dramatic' ? '🎭' : f.id === 'fade' ? '🌫️' : '🌈'}</div>
+                <span class="filter-name">${f.name}</span>
+            </button>
+        `).join('');
+    }
+
+    function setFilter(filter) {
+        currentFilter = filter;
+        renderFilters();
+        renderPhoto();
+    }
+
+    function updatePhotoAdjustment() {
+        const sliders = ['brightness', 'contrast', 'saturation', 'exposure', 'temperature', 'sharpness', 'blurAmount'];
+        sliders.forEach(s => {
+            const el = document.getElementById(s);
+            const key = s === 'blurAmount' ? 'blur' : s;
+            photoAdjustments[key] = parseFloat(el.value);
+            const valEl = document.getElementById(s === 'blurAmount' ? 'blurVal' : s + 'Val');
+            if (valEl) valEl.textContent = el.value;
+        });
+        renderPhoto();
+    }
+
+    function resetAdjustments() {
+        photoAdjustments = { brightness: 0, contrast: 0, saturation: 0, exposure: 0, temperature: 0, sharpness: 0, blur: 0 };
+        currentFilter = 'none';
+        ['brightness', 'contrast', 'saturation', 'exposure', 'temperature', 'sharpness'].forEach(s => {
+            document.getElementById(s).value = 0;
+            document.getElementById(s + 'Val').textContent = '0';
+        });
+        document.getElementById('blurAmount').value = 0;
+        document.getElementById('blurVal').textContent = '0';
+        renderFilters();
+        renderPhoto();
+    }
+
+    function setPhotoTool(tool) {
+        currentPhotoTool = tool;
+        document.querySelectorAll('.photo-tool').forEach(t => t.classList.toggle('active', t.dataset.tool === tool));
+        document.getElementById('cropOverlay').classList.toggle('active', tool === 'crop');
+    }
+
+    function photoZoom(delta) {
+        photoZoomLevel = Math.max(10, Math.min(400, photoZoomLevel + delta));
+        document.getElementById('photoZoomValue').textContent = photoZoomLevel + '%';
+        document.getElementById('photoCanvasWrapper').style.transform = `scale(${photoZoomLevel / 100})`;
+    }
+
+    function photoZoomFit() {
+        if (!originalImage) return;
+        const container = document.getElementById('photoCanvasContainer');
+        const scaleX = (container.clientWidth - 40) / originalImage.width;
+        const scaleY = (container.clientHeight - 40) / originalImage.height;
+        photoZoomLevel = Math.round(Math.min(scaleX, scaleY, 1) * 100);
+        document.getElementById('photoZoomValue').textContent = photoZoomLevel + '%';
+        document.getElementById('photoCanvasWrapper').style.transform = `scale(${photoZoomLevel / 100})`;
+    }
+
+    function photoRotate(degrees) {
+        if (!originalImage) return;
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        if (Math.abs(degrees) === 90) {
+            tempCanvas.width = photoCanvas.height;
+            tempCanvas.height = photoCanvas.width;
+        } else {
+            tempCanvas.width = photoCanvas.width;
+            tempCanvas.height = photoCanvas.height;
         }
+        
+        tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+        tempCtx.rotate(degrees * Math.PI / 180);
+        tempCtx.drawImage(photoCanvas, -photoCanvas.width / 2, -photoCanvas.height / 2);
+        
+        photoCanvas.width = tempCanvas.width;
+        photoCanvas.height = tempCanvas.height;
+        photoCtx.drawImage(tempCanvas, 0, 0);
+        
+        // Update original image reference
+        const img = new Image();
+        img.onload = () => { originalImage = img; document.getElementById('photoInfo').textContent = `${img.width} × ${img.height}`; };
+        img.src = photoCanvas.toDataURL();
+        
+        savePhotoState();
+    }
 
-        // ===== Presets =====
-        function applyPreset(preset) {
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-            event.target.closest('.preset-btn').classList.add('active');
-
-            switch(preset) {
-                case 'web':
-                    selectFormat('mp4');
-                    document.getElementById('qualityPreset').value = '3';
-                    document.getElementById('resolution').value = '1280:720';
-                    document.getElementById('videoCodec').value = 'libx264';
-                    break;
-                case 'mobile':
-                    selectFormat('mp4');
-                    document.getElementById('qualityPreset').value = '2';
-                    document.getElementById('resolution').value = '854:480';
-                    break;
-                case 'hq':
-                    selectFormat('mp4');
-                    document.getElementById('qualityPreset').value = '5';
-                    document.getElementById('resolution').value = '';
-                    break;
-                case 'tiny':
-                    selectFormat('mp4');
-                    document.getElementById('qualityPreset').value = '1';
-                    document.getElementById('resolution').value = '640:360';
-                    break;
-            }
+    function photoFlip(direction) {
+        if (!originalImage) return;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = photoCanvas.width;
+        tempCanvas.height = photoCanvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        if (direction === 'h') {
+            tempCtx.translate(tempCanvas.width, 0);
+            tempCtx.scale(-1, 1);
+        } else {
+            tempCtx.translate(0, tempCanvas.height);
+            tempCtx.scale(1, -1);
         }
+        tempCtx.drawImage(photoCanvas, 0, 0);
+        photoCtx.clearRect(0, 0, photoCanvas.width, photoCanvas.height);
+        photoCtx.drawImage(tempCanvas, 0, 0);
+        
+        savePhotoState();
+    }
 
-        // ===== Settings UI =====
-        function setSettingsTab(tab) {
-            document.querySelectorAll('.sidebar-right .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-            document.querySelectorAll('.sidebar-right .tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+    function photoAutoEnhance() {
+        document.getElementById('brightness').value = 5;
+        document.getElementById('contrast').value = 10;
+        document.getElementById('saturation').value = 15;
+        document.getElementById('exposure').value = 5;
+        updatePhotoAdjustment();
+        toast('success', 'Auto enhance applied');
+    }
+
+    function applyResize() {
+        if (!originalImage) return;
+        const newWidth = parseInt(document.getElementById('resizeWidth').value) || photoCanvas.width;
+        const newHeight = parseInt(document.getElementById('resizeHeight').value) || photoCanvas.height;
+        
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = newWidth;
+        tempCanvas.height = newHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(photoCanvas, 0, 0, newWidth, newHeight);
+        
+        photoCanvas.width = newWidth;
+        photoCanvas.height = newHeight;
+        photoCtx.drawImage(tempCanvas, 0, 0);
+        
+        const img = new Image();
+        img.onload = () => { originalImage = img; };
+        img.src = photoCanvas.toDataURL();
+        
+        document.getElementById('photoInfo').textContent = `${newWidth} × ${newHeight}`;
+        savePhotoState();
+        toast('success', `Resized to ${newWidth} × ${newHeight}`);
+    }
+
+    function savePhotoState() {
+        if (!originalImage) return;
+        photoHistory = photoHistory.slice(0, photoHistoryIndex + 1);
+        photoHistory.push(photoCanvas.toDataURL());
+        photoHistoryIndex++;
+        if (photoHistory.length > 50) { photoHistory.shift(); photoHistoryIndex--; }
+    }
+
+    function photoUndo() {
+        if (photoHistoryIndex > 0) {
+            photoHistoryIndex--;
+            loadPhotoState(photoHistory[photoHistoryIndex]);
         }
+    }
 
-        function updateVideoBitrate() {
-            const val = document.getElementById('videoBitrate').value;
-            document.getElementById('videoBitrateValue').textContent = videoBitrates[val];
+    function photoRedo() {
+        if (photoHistoryIndex < photoHistory.length - 1) {
+            photoHistoryIndex++;
+            loadPhotoState(photoHistory[photoHistoryIndex]);
         }
+    }
 
-        function updateAudioBitrate() {
-            const val = document.getElementById('audioBitrate').value;
-            document.getElementById('audioBitrateValue').textContent = audioBitrates[val - 1] + ' kbps';
+    function loadPhotoState(dataUrl) {
+        const img = new Image();
+        img.onload = () => {
+            photoCanvas.width = img.width;
+            photoCanvas.height = img.height;
+            photoCtx.drawImage(img, 0, 0);
+            originalImage = img;
+        };
+        img.src = dataUrl;
+    }
+
+    function exportPhoto() {
+        if (!originalImage) return;
+        const format = document.getElementById('photoExportFormat').value;
+        const quality = document.getElementById('photoQuality').value / 100;
+        const mimeType = format === 'png' ? 'image/png' : format === 'jpeg' ? 'image/jpeg' : 'image/webp';
+        
+        const dataUrl = photoCanvas.toDataURL(mimeType, quality);
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `edited-image.${format}`;
+        a.click();
+        
+        toast('success', 'Image exported!');
+    }
+
+    // ==================== VIDEO EDITOR MODE ====================
+    function handleVideoFile(file) {
+        if (!file) return;
+        videoFile = file;
+        videoPlayer.src = URL.createObjectURL(file);
+        videoPlayer.style.display = 'block';
+        document.getElementById('videoEmpty').style.display = 'none';
+        updateExportButton();
+        
+        // Add to timeline
+        document.getElementById('videoTrack').innerHTML = `
+            <div class="timeline-clip">
+                <div class="timeline-clip-thumb"><video src="${URL.createObjectURL(file)}" muted></video></div>
+                <div>
+                    <div class="timeline-clip-name">${file.name}</div>
+                    <div class="timeline-clip-duration">Loading...</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function onVideoLoaded() {
+        const duration = videoPlayer.duration;
+        document.getElementById('videoDuration').textContent = formatTime(duration);
+        document.getElementById('videoTrimEnd').placeholder = duration.toFixed(1);
+        
+        const clipDuration = document.querySelector('.timeline-clip-duration');
+        if (clipDuration) clipDuration.textContent = formatTime(duration);
+    }
+
+    function formatTime(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function toggleVideoPlay() {
+        if (!videoFile) return;
+        if (videoPlayer.paused) {
+            videoPlayer.play();
+            document.getElementById('videoPlayBtn').textContent = '⏸';
+        } else {
+            videoPlayer.pause();
+            document.getElementById('videoPlayBtn').textContent = '▶';
         }
+    }
 
-        // ===== Conversion =====
-        async function convertAll() {
-            if (!ffmpegLoaded || files.length === 0) return;
+    function updateVideoTime() {
+        const current = videoPlayer.currentTime;
+        const duration = videoPlayer.duration || 1;
+        const percent = (current / duration) * 100;
+        
+        document.getElementById('videoCurrentTime').textContent = formatTime(current);
+        document.getElementById('videoProgress').style.width = percent + '%';
+        document.getElementById('videoHandle').style.left = percent + '%';
+        document.getElementById('timelinePlayhead').style.left = percent + '%';
+    }
 
-            document.getElementById('convertBtn').disabled = true;
-            document.getElementById('statusBadge').textContent = 'Converting...';
-            document.getElementById('statusBadge').className = 'status-badge loading';
+    function seekVideo(e) {
+        if (!videoFile) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        videoPlayer.currentTime = percent * videoPlayer.duration;
+    }
 
-            for (const f of files) {
-                if (f.status === 'done') continue;
-                await convertFile(f);
-            }
+    function setVolume(val) { videoPlayer.volume = val; }
+    function toggleMute() { videoPlayer.muted = !videoPlayer.muted; }
 
-            document.getElementById('statusBadge').textContent = 'Ready';
-            document.getElementById('statusBadge').className = 'status-badge ready';
-            updateUI();
-            toast('success', 'All conversions complete!');
-        }
+    function setVideoTab(tab) {
+        document.querySelectorAll('.video-sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+        document.querySelectorAll('.video-sidebar-panel').forEach(p => p.classList.toggle('active', p.id === 'videoTab-' + tab));
+    }
 
-        async function convertFile(fileObj) {
-            fileObj.status = 'converting';
-            fileObj.progress = 0;
-            renderFiles();
+    function updateVideoSpeed() {
+        const speed = document.getElementById('videoSpeed').value;
+        document.getElementById('videoSpeedVal').textContent = speed + 'x';
+        videoPlayer.playbackRate = parseFloat(speed);
+    }
 
-            const inputExt = fileObj.name.split('.').pop();
-            const inputName = `input.${inputExt}`;
-            const outputName = `output.${selectedFormat}`;
+    function setTrimStart() {
+        document.getElementById('videoTrimStart').value = videoPlayer.currentTime.toFixed(1);
+    }
 
-            try {
-                ffmpeg.FS('writeFile', inputName, await window.ffmpegFetchFile(fileObj.file));
-                const args = buildFFmpegArgs(inputName, outputName, fileObj);
-                await ffmpeg.run(...args);
+    function setTrimEnd() {
+        document.getElementById('videoTrimEnd').value = videoPlayer.currentTime.toFixed(1);
+    }
 
-                const data = ffmpeg.FS('readFile', outputName);
-                const blob = new Blob([data.buffer], { type: getMimeType(selectedFormat) });
+    function splitAtPlayhead() {
+        toast('info', 'Split feature coming soon!');
+    }
 
-                fileObj.converted = URL.createObjectURL(blob);
-                fileObj.convertedSize = blob.size;
-                fileObj.convertedName = fileObj.name.replace(/\.[^/.]+$/, '') + '.' + selectedFormat;
-                fileObj.status = 'done';
+    function timelineZoom(delta) {
+        toast('info', 'Timeline zoom coming soon!');
+    }
 
-                ffmpeg.FS('unlink', inputName);
-                ffmpeg.FS('unlink', outputName);
-
-                if (document.getElementById('autoDownload')?.checked) downloadFile(fileObj.id);
-            } catch (err) {
-                console.error('Conversion error:', err);
-                fileObj.status = 'error';
-                toast('error', `Failed: ${fileObj.name}`);
-            }
-            renderFiles();
-        }
-
-        function buildFFmpegArgs(input, output, fileObj) {
+    async function exportVideo() {
+        if (!videoFile || !ffmpegLoaded) return;
+        
+        document.getElementById('exportStatus').textContent = 'Processing...';
+        
+        const format = document.getElementById('videoExportFormat').value;
+        const quality = document.getElementById('videoExportQuality').value;
+        const resolution = document.getElementById('videoExportRes').value;
+        
+        const inputName = 'input' + videoFile.name.substring(videoFile.name.lastIndexOf('.'));
+        const outputName = `output.${format}`;
+        
+        try {
+            ffmpeg.FS('writeFile', inputName, await window.ffmpegFetchFile(videoFile));
+            
             const args = [];
-            const trimStart = document.getElementById('trimStart').value;
-            const trimEnd = document.getElementById('trimEnd').value;
-
-            // Input options (before -i)
+            const trimStart = document.getElementById('videoTrimStart').value;
+            const trimEnd = document.getElementById('videoTrimEnd').value;
+            
             if (trimStart) args.push('-ss', trimStart);
-            args.push('-i', input);
+            args.push('-i', inputName);
             if (trimEnd) args.push('-t', String(trimEnd - (trimStart || 0)));
-
-            const isVideo = ['mp4', 'webm', 'mkv', 'avi', 'mov', 'gif', 'ts', 'flv', 'wmv'].includes(selectedFormat);
-            const isAudio = ['mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a', 'wma', 'opus'].includes(selectedFormat);
-            const isImage = ['jpg', 'png', 'webp', 'bmp', 'tiff', 'ico'].includes(selectedFormat);
-
-            // Video processing
-            if (isVideo && selectedFormat !== 'gif') {
-                const codec = document.getElementById('videoCodec').value;
-                if (codec !== 'copy') {
-                    args.push('-c:v', codec);
-                    const quality = document.getElementById('qualityPreset').value;
-                    if (codec === 'libx264' || codec === 'libx265') args.push('-crf', String(qualityCRF[quality]));
-                    
-                    const bitrate = document.getElementById('videoBitrate').value;
-                    if (bitrate > 0) args.push('-b:v', videoBitrates[bitrate]);
-                } else {
-                    args.push('-c:v', 'copy');
-                }
-
-                // Video filters
+            
+            if (format === 'mp3') {
+                args.push('-vn', '-c:a', 'libmp3lame', '-b:a', '192k');
+            } else if (format === 'gif') {
+                const scale = resolution ? resolution.split(':')[0] : '480';
+                args.push('-vf', `fps=15,scale=${scale}:-1:flags=lanczos`, '-loop', '0');
+            } else {
+                args.push('-c:v', 'libx264', '-crf', String(qualityCRF[quality]));
+                
                 const vf = [];
-                const res = document.getElementById('resolution').value;
-                if (res && res !== 'custom') {
-                    const [w, h] = res.split(':');
-                    vf.push(document.getElementById('keepAspect').checked ? 
-                        `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2` :
-                        `scale=${w}:${h}`);
-                } else if (res === 'custom') {
-                    const w = document.getElementById('customWidth').value || -1;
-                    const h = document.getElementById('customHeight').value || -1;
-                    if (w > 0 || h > 0) vf.push(`scale=${w}:${h}`);
+                if (resolution) {
+                    const [w, h] = resolution.split(':');
+                    vf.push(`scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2`);
                 }
-
-                const fps = document.getElementById('frameRate').value;
-                if (fps) vf.push(`fps=${fps}`);
-
-                const rotation = document.getElementById('rotation').value;
+                
+                const rotation = document.getElementById('videoRotation').value;
                 if (rotation === 'hflip' || rotation === 'vflip') vf.push(rotation);
                 else if (rotation) vf.push(`rotate=${rotation}*PI/180`);
-
-                const speed = document.getElementById('speed').value;
-                if (speed) vf.push(`setpts=${1/parseFloat(speed)}*PTS`);
-
+                
+                const speed = document.getElementById('videoSpeed').value;
+                if (speed && speed != 1) vf.push(`setpts=${1/parseFloat(speed)}*PTS`);
+                
+                // Color adjustments
+                const brightness = document.getElementById('vBrightness').value;
+                const contrast = document.getElementById('vContrast').value;
+                const saturation = document.getElementById('vSaturation').value;
+                if (brightness != 0 || contrast != 0 || saturation != 0) {
+                    vf.push(`eq=brightness=${brightness}:contrast=${1 + parseFloat(contrast)}:saturation=${1 + parseFloat(saturation)}`);
+                }
+                
+                // Effects
+                if (document.getElementById('effectGrayscale').checked) vf.push('colorchannelmixer=.3:.4:.3:0:.3:.4:.3:0:.3:.4:.3');
+                if (document.getElementById('effectNegative').checked) vf.push('negate');
+                if (document.getElementById('effectVignette').checked) vf.push('vignette');
+                
                 if (vf.length > 0) args.push('-vf', vf.join(','));
-
-                // Audio for video
-                const audioCodec = document.getElementById('audioCodec').value;
-                if (audioCodec === 'none') {
+                
+                // Audio
+                if (document.getElementById('audioRemove').checked) {
                     args.push('-an');
-                } else if (audioCodec !== 'copy') {
-                    args.push('-c:a', audioCodec);
-                    const ab = audioBitrates[document.getElementById('audioBitrate').value - 1];
-                    args.push('-b:a', ab + 'k');
-                    if (speed) args.push('-af', `atempo=${speed}`);
                 } else {
-                    args.push('-c:a', 'copy');
+                    args.push('-c:a', 'aac', '-b:a', '192k');
+                    const af = [];
+                    const vol = document.getElementById('audioVol').value / 100;
+                    if (vol != 1) af.push(`volume=${vol}`);
+                    if (document.getElementById('audioNormalize').checked) af.push('loudnorm');
+                    const fadeIn = document.getElementById('audioFadeIn').value;
+                    const fadeOut = document.getElementById('audioFadeOut').value;
+                    if (fadeIn) af.push(`afade=t=in:d=${fadeIn}`);
+                    if (fadeOut) af.push(`afade=t=out:st=${videoPlayer.duration - fadeOut}:d=${fadeOut}`);
+                    if (speed && speed != 1) af.push(`atempo=${speed}`);
+                    if (af.length > 0) args.push('-af', af.join(','));
                 }
-            } else if (selectedFormat === 'gif') {
-                const res = document.getElementById('resolution').value;
-                const scale = res ? res.split(':')[0] : '480';
-                args.push('-vf', `fps=15,scale=${scale}:-1:flags=lanczos`, '-loop', '0');
-            } else if (isAudio) {
-                const codec = { mp3: 'libmp3lame', aac: 'aac', ogg: 'libvorbis', flac: 'flac', wav: null, m4a: 'aac', opus: 'libopus' }[selectedFormat];
-                if (codec) args.push('-c:a', codec);
-                const ab = audioBitrates[document.getElementById('audioBitrate').value - 1];
-                if (selectedFormat !== 'flac' && selectedFormat !== 'wav') args.push('-b:a', ab + 'k');
-                const sr = document.getElementById('sampleRate').value;
-                if (sr) args.push('-ar', sr);
-                const ch = document.getElementById('audioChannels').value;
-                if (ch) args.push('-ac', ch);
-                if (document.getElementById('normalizeAudio').checked) args.push('-af', 'loudnorm');
-            } else if (isImage) {
-                const res = document.getElementById('resolution').value;
-                if (res && res !== 'custom') {
-                    const [w, h] = res.split(':');
-                    args.push('-vf', `scale=${w}:${h}`);
-                }
-                if (selectedFormat === 'jpg') args.push('-q:v', '2');
             }
-
-            if (document.getElementById('stripMetadata').checked) args.push('-map_metadata', '-1');
-
-            const customArgs = document.getElementById('customArgs').value.trim();
-            if (customArgs) args.push(...customArgs.split(' '));
-
-            args.push('-y', output);
+            
+            args.push('-y', outputName);
             console.log('FFmpeg args:', args.join(' '));
-            return args;
-        }
-
-        function updateConversionProgress(progress) {
-            const f = files.find(f => f.status === 'converting');
-            if (f) { f.progress = progress; renderFiles(); }
-        }
-
-        function getMimeType(fmt) {
-            const types = { mp4: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska', avi: 'video/x-msvideo', mov: 'video/quicktime', gif: 'image/gif', mp3: 'audio/mpeg', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', flac: 'audio/flac', m4a: 'audio/mp4', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', bmp: 'image/bmp', tiff: 'image/tiff', ico: 'image/x-icon' };
-            return types[fmt] || 'application/octet-stream';
-        }
-
-        // ===== Download & Preview =====
-        function downloadFile(id) {
-            const f = files.find(f => f.id == id);
-            if (f?.converted) {
-                const a = document.createElement('a');
-                a.href = f.converted;
-                a.download = f.convertedName;
-                a.click();
-            }
-        }
-
-        function previewFile(id) {
-            const f = files.find(f => f.id == id);
-            if (!f?.converted) return;
-            previewFileId = id;
             
-            document.getElementById('previewTitle').textContent = f.convertedName;
-            const content = document.getElementById('previewContent');
-            const type = getMimeType(selectedFormat).split('/')[0];
+            await ffmpeg.run(...args);
             
-            if (type === 'video') content.innerHTML = `<video controls autoplay src="${f.converted}"></video>`;
-            else if (type === 'audio') content.innerHTML = `<audio controls autoplay src="${f.converted}"></audio>`;
-            else content.innerHTML = `<img src="${f.converted}" alt="${f.convertedName}">`;
+            const data = ffmpeg.FS('readFile', outputName);
+            const blob = new Blob([data.buffer], { type: getMimeType(format) });
             
-            document.getElementById('previewModal').classList.add('active');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `edited-video.${format}`;
+            a.click();
+            
+            ffmpeg.FS('unlink', inputName);
+            ffmpeg.FS('unlink', outputName);
+            
+            document.getElementById('exportStatus').textContent = 'Export complete!';
+            toast('success', 'Video exported!');
+        } catch (err) {
+            console.error('Export error:', err);
+            document.getElementById('exportStatus').textContent = 'Export failed: ' + err.message;
+            toast('error', 'Export failed');
         }
+    }
 
-        function downloadPreview() { if (previewFileId) downloadFile(previewFileId); }
+    async function extractFrames() {
+        if (!videoFile || !ffmpegLoaded) return;
+        toast('info', 'Extracting frames...');
+        // Implementation would extract frames as images
+        toast('info', 'Frame extraction coming soon!');
+    }
 
-        // ===== Modals =====
-        function showSettings() { document.getElementById('settingsModal').classList.add('active'); }
-        function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+    async function extractAudio() {
+        if (!videoFile || !ffmpegLoaded) return;
+        document.getElementById('videoExportFormat').value = 'mp3';
+        setVideoTab('export');
+        toast('info', 'Select MP3 format and click Export');
+    }
 
-        // ===== URL Import =====
-        function addFromUrl() {
-            const url = prompt('Enter file URL:');
-            if (url) toast('info', 'URL import coming soon!');
-        }
-
-        // ===== Toast =====
-        function toast(type, message) {
-            if (!document.getElementById('showNotifications')?.checked) return;
-            const t = document.createElement('div');
-            t.className = `toast ${type}`;
-            t.innerHTML = `<span class="toast-icon">${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span><span class="toast-text">${message}</span>`;
-            document.getElementById('toastContainer').appendChild(t);
-            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 4000);
-        }
+    // ===== Utils =====
+    function toast(type, message) {
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.innerHTML = `<span class="toast-icon">${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span><span class="toast-text">${message}</span>`;
+        document.getElementById('toastContainer').appendChild(t);
+        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+    }
     </script>
 </body>
 </html>
